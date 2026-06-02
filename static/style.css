@@ -1,0 +1,174 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0f172a;
+  color: #f1f5f9;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.hidden { display: none !important; }
+
+/* ── Role screen ── */
+#role-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.role-card {
+  background: #1e293b;
+  border-radius: 1.5rem;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+
+.role-card h1 {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: -1px;
+  margin-bottom: 0.4rem;
+}
+
+.role-card p {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.role-card .sub {
+  margin-top: 1.8rem;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.role-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.btn-role {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border: none;
+  border-radius: 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.btn-role:hover { transform: translateY(-2px); opacity: 0.92; }
+.btn-role:active { transform: translateY(0); }
+
+.btn-role .icon { font-size: 1.4rem; }
+
+.btn-role.estudiante {
+  background: #0ea5e9;
+  color: #fff;
+}
+
+.btn-role.conductor {
+  background: #f97316;
+  color: #fff;
+}
+
+/* ── Map screen ── */
+#map-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+#role-badge {
+  font-weight: 700;
+  color: #38bdf8;
+  margin-right: auto;
+  font-size: 1rem;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dot.connecting { background: #facc15; animation: pulse 1s infinite; }
+.dot.connected   { background: #4ade80; }
+.dot.error       { background: #f87171; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+#status-text { color: #94a3b8; }
+
+#btn-change-role {
+  margin-left: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  background: #334155;
+  border: none;
+  border-radius: 0.5rem;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+#btn-change-role:hover { background: #475569; }
+
+#map {
+  flex: 1;
+  z-index: 1;
+}
+
+#legend {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.6rem 1rem;
+  background: #1e293b;
+  border-top: 1px solid #334155;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.dot-legend {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.3rem;
+}
+
+.dot-legend.blue   { background: #0ea5e9; }
+.dot-legend.orange { background: #f97316; }
