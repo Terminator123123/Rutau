@@ -4,46 +4,80 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RutaU</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      background: #1e293b;
+      border-radius: 1.25rem;
+      padding: 2.5rem 2rem;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .card h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #38bdf8;
+      letter-spacing: -0.5px;
+      margin-bottom: 1.25rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #0f2a1a;
+      color: #4ade80;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.85rem;
+      border-radius: 2rem;
+      border: 1px solid #166534;
+      margin-bottom: 1.5rem;
+    }
+
+    .card p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .card p + p {
+      margin-top: 0.75rem;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #334155;
+      margin: 1.75rem 0;
+    }
+
+    .footer {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
 </head>
 <body>
-
-  <!-- Role selection screen -->
-  <div id="role-screen">
-    <div class="role-card">
-      <h1>RutaU</h1>
-      <p>Coordinación de transporte en la Universidad de La Guajira</p>
-      <p class="sub">¿Cómo vas hoy?</p>
-      <div class="role-buttons">
-        <button class="btn-role estudiante" onclick="startSession('estudiante')">
-          <span class="icon">🎒</span>
-          Soy Estudiante
-        </button>
-        <button class="btn-role conductor" onclick="startSession('conductor')">
-          <span class="icon">🚐</span>
-          Soy Conductor
-        </button>
-      </div>
-    </div>
+  <div class="card">
+    <h1>RutaU</h1>
+    <span class="badge">En desarrollo</span>
+    <p>Estamos preparando la aplicacion para lanzarla correctamente.</p>
+    <p>Si llegaste aqui, es porque alguien te paso el enlace antes de tiempo. Gracias por el interes.</p>
+    <hr class="divider" />
+    <p class="footer">Universidad de La Guajira — 2026</p>
   </div>
-
-  <!-- Map screen -->
-  <div id="map-screen" class="hidden">
-    <div id="topbar">
-      <span id="role-badge"></span>
-      <span id="status-dot" class="dot connecting"></span>
-      <span id="status-text">Conectando...</span>
-      <button id="btn-change-role" onclick="changeRole()">Cambiar rol</button>
-    </div>
-    <div id="map"></div>
-    <div id="legend">
-      <span><span class="dot-legend blue"></span> Estudiantes</span>
-      <span><span class="dot-legend orange"></span> Conductores</span>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/app.js"></script>
 </body>
 </html>
