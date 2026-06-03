@@ -181,6 +181,31 @@ form input::placeholder { color: #475569; }
 }
 
 .btn-continue:hover { opacity: 0.88; }
+.btn-continue:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(15,23,42,0.25);
+  border-top-color: #0f172a;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.form-success {
+  color: #4ade80;
+  font-size: 0.85rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(74,222,128,0.08);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(74,222,128,0.2);
+  text-align: center;
+  line-height: 1.4;
+}
 
 /* ── Role buttons ── */
 .role-buttons {

@@ -35,6 +35,12 @@ function showTab(tab) {
   document.querySelectorAll(".tab").forEach((t, i) => {
     t.classList.toggle("active", isLogin ? i === 0 : i === 1);
   });
+  // Reset error/success messages when switching tabs
+  ["login-error", "register-error"].forEach(id => {
+    const el = document.getElementById(id);
+    el.className = "form-error hidden";
+    el.textContent = "";
+  });
 }
 
 function selectRole(role) {
@@ -50,24 +56,24 @@ async function handleLogin(e) {
   const email    = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-password").value;
   const errEl    = document.getElementById("login-error");
+  const btn      = e.target.querySelector("button[type=submit]");
   errEl.classList.add("hidden");
 
+  setLoading(btn, true);
   try {
     const res = await fetch("/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.detail || "Credenciales incorrectas");
-    }
     const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Credenciales incorrectas");
     saveSession(data);
     startMap();
   } catch (err) {
     errEl.textContent = err.message;
     errEl.classList.remove("hidden");
+    setLoading(btn, false);
   }
 }
 
@@ -80,24 +86,30 @@ async function handleRegister(e) {
   const password = document.getElementById("reg-password").value;
   const role     = document.getElementById("reg-role").value;
   const errEl    = document.getElementById("register-error");
+  const btn      = e.target.querySelector("button[type=submit]");
   errEl.classList.add("hidden");
 
+  setLoading(btn, true);
   try {
     const res = await fetch("/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password, role }),
     });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.detail || "Error al registrarse");
-    }
     const data = await res.json();
-    saveSession(data);
-    startMap();
+    if (!res.ok) throw new Error(data.detail || "Error al registrarse");
+
+    // Account created but needs email verification before accessing the map
+    errEl.className = "form-success";
+    errEl.textContent = "¡Cuenta creada! Revisa tu correo y haz clic en el enlace de verificación para ingresar.";
+    errEl.classList.remove("hidden");
+    e.target.reset();
+    setLoading(btn, false);
   } catch (err) {
+    errEl.className = "form-error";
     errEl.textContent = err.message;
     errEl.classList.remove("hidden");
+    setLoading(btn, false);
   }
 }
 
@@ -225,7 +237,7 @@ function connectWS(lat, lng) {
   ws.onopen  = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
   ws.onclose   = (e) => {
-    if (e.code === 4001) { logout(); return; }
+    if (e.code === 4001 || e.code === 4003) { logout(); return; }
     setStatus("connecting", "Reconectando...");
   };
   ws.onerror = () => setStatus("error", "Error de conexion");
@@ -396,6 +408,16 @@ function refreshClusters() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function setLoading(btn, loading) {
+  btn.disabled = loading;
+  if (loading) {
+    btn._orig = btn.textContent;
+    btn.innerHTML = '<span class="spinner"></span>';
+  } else {
+    btn.textContent = btn._orig || btn.textContent;
+  }
+}
 
 function setStatus(state, text) {
   document.getElementById("status-dot").className = `dot ${state}`;
