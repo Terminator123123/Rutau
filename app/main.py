@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -8,7 +9,7 @@ from app.models import LocationUpdate, UserLocation
 
 app = FastAPI(
     title="ColectivoU",
-    description="API de coordinación de transporte colectivo en tiempo real — Universidad de La Guajira",
+    description="API de coordinacion de transporte colectivo en tiempo real — Universidad de La Guajira",
     version="1.0.0",
 )
 
@@ -33,7 +34,7 @@ async def health():
 
 @app.get("/usuarios/activos", tags=["API"])
 async def usuarios_activos():
-    """Lista de usuarios conectados en este momento con su rol y ubicación."""
+    """Lista de usuarios conectados en este momento con su rol y ubicacion."""
     usuarios = manager.get_all_locations()
     return {
         "total": len(usuarios),
@@ -59,7 +60,6 @@ async def websocket_endpoint(websocket: WebSocket):
     user_id = str(uuid.uuid4())
     await manager.connect(websocket, user_id)
 
-    # send current state to new user
     await websocket.send_text(json.dumps({
         "type": "snapshot",
         "users": manager.get_all_locations()
@@ -71,7 +71,11 @@ async def websocket_endpoint(websocket: WebSocket):
             payload = json.loads(data)
             update = LocationUpdate(**payload)
 
-            location = UserLocation(id=user_id, **update.model_dump())
+            location = UserLocation(
+                id=user_id,
+                connected_at=manager.get_connected_at(user_id),
+                **update.model_dump()
+            )
             manager.set_location(user_id, location)
 
             await manager.broadcast({

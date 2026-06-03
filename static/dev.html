@@ -9,10 +9,29 @@
 </head>
 <body>
 
-  <div id="role-screen">
+  <!-- Name screen -->
+  <div id="name-screen">
     <div class="role-card">
       <h1>ColectivoU</h1>
       <p>Coordinacion de transporte en la Universidad de La Guajira</p>
+      <p class="sub">Como te llamas?</p>
+      <input
+        id="name-input"
+        type="text"
+        placeholder="Tu nombre"
+        maxlength="30"
+        autocomplete="off"
+        onkeydown="if(event.key==='Enter') goToRole()"
+      />
+      <button class="btn-continue" onclick="goToRole()">Continuar</button>
+    </div>
+  </div>
+
+  <!-- Role selection screen -->
+  <div id="role-screen" class="hidden">
+    <div class="role-card">
+      <h1>ColectivoU</h1>
+      <p id="greeting"></p>
       <p class="sub">Como vas hoy?</p>
       <div class="role-buttons">
         <button class="btn-role estudiante" onclick="startSession('estudiante')">
@@ -25,17 +44,21 @@
     </div>
   </div>
 
+  <!-- Map screen -->
   <div id="map-screen" class="hidden">
     <div id="topbar">
       <span id="role-badge"></span>
+      <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
       <span id="status-dot" class="dot connecting"></span>
       <span id="status-text">Conectando...</span>
-      <button id="btn-change-role" onclick="changeRole()">Cambiar rol</button>
+      <button id="btn-change-role" onclick="changeRole()">Cambiar</button>
     </div>
     <div id="map"></div>
     <div id="legend">
       <span><span class="dot-legend blue"></span> Estudiantes</span>
-      <span><span class="dot-legend orange"></span> Conductores</span>
+      <span><span class="dot-legend orange"></span> Disponible</span>
+      <span><span class="dot-legend red"></span> Lleno</span>
+      <span><span class="dot-legend yellow"></span> En camino</span>
     </div>
   </div>
 

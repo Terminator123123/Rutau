@@ -14,7 +14,8 @@ body {
 
 .hidden { display: none !important; }
 
-/* ── Role screen ── */
+/* ── Shared card ── */
+#name-screen,
 #role-screen {
   display: flex;
   align-items: center;
@@ -54,6 +55,44 @@ body {
   color: #e2e8f0;
 }
 
+/* ── Name input ── */
+#name-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  color: #f1f5f9;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#name-input:focus {
+  border-color: #38bdf8;
+}
+
+#name-input::placeholder {
+  color: #475569;
+}
+
+.btn-continue {
+  width: 100%;
+  padding: 0.9rem;
+  background: #38bdf8;
+  border: none;
+  border-radius: 0.75rem;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-continue:hover { opacity: 0.88; }
+
+/* ── Role buttons ── */
 .role-buttons {
   display: flex;
   flex-direction: column;
@@ -77,17 +116,8 @@ body {
 .btn-role:hover { transform: translateY(-2px); opacity: 0.92; }
 .btn-role:active { transform: translateY(0); }
 
-.btn-role .icon { font-size: 1.4rem; }
-
-.btn-role.estudiante {
-  background: #0ea5e9;
-  color: #fff;
-}
-
-.btn-role.conductor {
-  background: #f97316;
-  color: #fff;
-}
+.btn-role.estudiante { background: #0ea5e9; color: #fff; }
+.btn-role.conductor  { background: #f97316; color: #fff; }
 
 /* ── Map screen ── */
 #map-screen {
@@ -110,9 +140,29 @@ body {
 #role-badge {
   font-weight: 700;
   color: #38bdf8;
-  margin-right: auto;
   font-size: 1rem;
 }
+
+/* Status button (conductor only) */
+#btn-status {
+  padding: 0.3rem 0.85rem;
+  border: none;
+  border-radius: 2rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+#btn-status:hover { opacity: 0.85; }
+
+#btn-status.disponible { background: #f97316; color: #fff; }
+#btn-status.lleno      { background: #ef4444; color: #fff; }
+#btn-status.en-camino  { background: #eab308; color: #000; }
+
+/* Connection indicator */
+.spacer { flex: 1; }
 
 .dot {
   width: 10px;
@@ -120,21 +170,22 @@ body {
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .dot.connecting { background: #facc15; animation: pulse 1s infinite; }
-.dot.connected   { background: #4ade80; }
-.dot.error       { background: #f87171; }
+.dot.connected  { background: #4ade80; }
+.dot.error      { background: #f87171; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.3; }
 }
 
-#status-text { color: #94a3b8; }
+#status-text { color: #94a3b8; font-size: 0.8rem; }
 
 #btn-change-role {
-  margin-left: 0.5rem;
+  margin-left: 0.25rem;
   padding: 0.3rem 0.75rem;
   background: #334155;
   border: none;
@@ -142,6 +193,7 @@ body {
   color: #cbd5e1;
   cursor: pointer;
   font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 #btn-change-role:hover { background: #475569; }
@@ -151,15 +203,17 @@ body {
   z-index: 1;
 }
 
+/* ── Legend ── */
 #legend {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 0.6rem 1rem;
   background: #1e293b;
   border-top: 1px solid #334155;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #94a3b8;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .dot-legend {
@@ -168,7 +222,50 @@ body {
   height: 10px;
   border-radius: 50%;
   margin-right: 0.3rem;
+  vertical-align: middle;
 }
 
 .dot-legend.blue   { background: #0ea5e9; }
 .dot-legend.orange { background: #f97316; }
+.dot-legend.red    { background: #ef4444; }
+.dot-legend.yellow { background: #eab308; }
+
+/* ── Popup ── */
+.leaflet-popup-content-wrapper {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-radius: 0.75rem;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.leaflet-popup-tip {
+  background: #1e293b;
+}
+
+.leaflet-popup-content {
+  margin: 0.75rem 1rem;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.popup-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+  margin-bottom: 0.2rem;
+}
+
+.popup-info {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.popup-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.2rem;
+}
+
+.popup-status.disponible { color: #f97316; }
+.popup-status.lleno      { color: #ef4444; }
+.popup-status.en-camino  { color: #eab308; }
