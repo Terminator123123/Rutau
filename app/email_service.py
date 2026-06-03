@@ -1,6 +1,5 @@
-import json
 import os
-import urllib.request
+import resend
 
 _public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 APP_URL = os.getenv("APP_URL") or (f"https://{_public_domain}" if _public_domain else "http://localhost:8000")
@@ -14,29 +13,17 @@ def _send(to: str, subject: str, html: str) -> None:
         print(f"[EMAIL] Sin RESEND_API_KEY — correo no enviado a {to}")
         return
 
-    payload = json.dumps({
-        "from": FROM_ADDRESS,
-        "to": [to],
-        "subject": subject,
-        "html": html,
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
+    resend.api_key = api_key
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            print(f"[EMAIL] Enviado OK → {to} (status {resp.status})")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        print(f"[EMAIL] Error {e.code} de Resend → {body}")
+        r = resend.Emails.send({
+            "from": FROM_ADDRESS,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        })
+        print(f"[EMAIL] Enviado OK → {to} | id={r.get('id')}")
+    except Exception as e:
+        print(f"[EMAIL] Error Resend → {e}")
         raise
 
 
