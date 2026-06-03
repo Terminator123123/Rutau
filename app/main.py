@@ -1,20 +1,44 @@
 import json
+import os
 import time
 import uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, status
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db, User
+from app.email_service import send_reset_email, send_verification_email
 from app.manager import manager
-from app.models import LocationUpdate, UserLocation, RegisterRequest, LoginRequest, TokenResponse, UserOut
-from app.auth import hash_password, verify_password, create_token, get_current_user, get_user_from_token_str
+from app.models import (
+    ForgotPasswordRequest,
+    LocationUpdate,
+    LoginRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+    UserLocation,
+    UserOut,
+)
+from app.auth import (
+    generate_token,
+    get_current_user,
+    get_user_from_token_str,
+    hash_password,
+    verify_password,
+    create_token,
+)
+
+_is_prod = os.getenv("DB_URL", "").startswith("postgresql")
 
 app = FastAPI(
     title="ColectivoU",
     description="API de coordinacion de transporte colectivo en tiempo real — Universidad de La Guajira",
     version="1.0.0",
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -36,19 +60,27 @@ async def dev():
 
 @app.post("/register", response_model=TokenResponse, tags=["Auth"])
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
-    """Registra un nuevo usuario y devuelve un token JWT."""
+    """Registra un nuevo usuario. Envía email de verificación antes de permitir el acceso."""
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ya registrado")
 
+    token = generate_token()
     user = User(
         name=body.name,
         email=body.email,
         hashed_password=hash_password(body.password),
         role=body.role,
+        is_verified=False,
+        verification_token=token,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    try:
+        send_verification_email(user.email, user.name, token)
+    except Exception as e:
+        print(f"[EMAIL] Error enviando verificación: {e}")
 
     return TokenResponse(
         access_token=create_token(user),
@@ -56,12 +88,27 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/verify-email", include_in_schema=False)
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """Verifica el email del usuario mediante el token enviado por correo."""
+    user = db.query(User).filter(User.verification_token == token).first()
+    if not user:
+        return HTMLResponse(_page("Token inválido", "El enlace de verificación no es válido o ya fue usado.", error=True))
+
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    return RedirectResponse(url="/?verified=1")
+
+
 @app.post("/login", response_model=TokenResponse, tags=["Auth"])
 def login(body: LoginRequest, db: Session = Depends(get_db)):
-    """Inicia sesion y devuelve un token JWT."""
+    """Inicia sesión. El usuario debe haber verificado su email."""
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales incorrectas")
+    if not user.is_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta no verificada. Revisa tu correo.")
 
     return TokenResponse(
         access_token=create_token(user),
@@ -72,12 +119,82 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 @app.get("/me", response_model=UserOut, tags=["Auth"])
 def me(current_user: User = Depends(get_current_user)):
     """Devuelve el perfil del usuario autenticado."""
-    return UserOut(
-        id=current_user.id,
-        name=current_user.name,
-        email=current_user.email,
-        role=current_user.role,
-    )
+    return UserOut(id=current_user.id, name=current_user.name, email=current_user.email, role=current_user.role)
+
+
+@app.post("/forgot-password", tags=["Auth"])
+def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Envía un email con enlace para restablecer contraseña."""
+    user = db.query(User).filter(User.email == body.email).first()
+    # Respuesta genérica para no revelar si el email existe
+    if user and user.is_verified:
+        token = generate_token()
+        user.reset_token = token
+        user.reset_token_expires = datetime.now(timezone.utc).timestamp() + 1800  # 30 min
+        db.commit()
+        try:
+            send_reset_email(user.email, user.name, token)
+        except Exception as e:
+            print(f"[EMAIL] Error enviando reset: {e}")
+
+    return {"message": "Si el email existe, recibirás un enlace para restablecer tu contraseña."}
+
+
+@app.get("/reset-password", include_in_schema=False)
+def reset_password_page(token: str, db: Session = Depends(get_db)):
+    """Muestra el formulario para restablecer contraseña."""
+    user = db.query(User).filter(User.reset_token == token).first()
+    if not user or not user.reset_token_expires or datetime.now(timezone.utc).timestamp() > user.reset_token_expires:
+        return HTMLResponse(_page("Enlace expirado", "Este enlace ya no es válido. Solicita uno nuevo.", error=True))
+
+    html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Nueva contraseña — ColectivoU</title>
+    <style>*{{margin:0;padding:0;box-sizing:border-box}}
+    body{{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#f1f5f9;min-height:100vh;display:flex;align-items:center;justify-content:center}}
+    .card{{background:#1e293b;border-radius:1.25rem;padding:2.5rem 2rem;max-width:360px;width:90%;text-align:center}}
+    h1{{font-size:1.5rem;margin-bottom:.5rem;color:#818cf8}}
+    p{{color:#94a3b8;margin-bottom:1.5rem;font-size:.9rem}}
+    input{{width:100%;padding:.75rem 1rem;border-radius:.75rem;border:1px solid #334155;background:#0f172a;color:#f1f5f9;font-size:1rem;margin-bottom:1rem}}
+    button{{width:100%;padding:.75rem;border-radius:.75rem;border:none;background:#6366f1;color:white;font-size:1rem;font-weight:600;cursor:pointer}}
+    .msg{{margin-top:1rem;font-size:.9rem}}</style></head>
+    <body><div class="card">
+    <h1>Nueva contraseña</h1><p>Ingresa tu nueva contraseña para ColectivoU</p>
+    <form id="form">
+      <input type="password" id="pwd" placeholder="Nueva contraseña" required minlength="6">
+      <input type="password" id="pwd2" placeholder="Confirmar contraseña" required minlength="6">
+      <button type="submit">Guardar contraseña</button>
+    </form>
+    <div class="msg" id="msg"></div></div>
+    <script>
+    document.getElementById('form').onsubmit=async e=>{{
+      e.preventDefault();
+      const p=document.getElementById('pwd').value;
+      const p2=document.getElementById('pwd2').value;
+      const msg=document.getElementById('msg');
+      if(p!==p2){{msg.textContent='Las contraseñas no coinciden';return}}
+      const r=await fetch('/reset-password',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{token:'{token}',new_password:p}})}});
+      const d=await r.json();
+      if(r.ok){{msg.style.color='#4ade80';msg.textContent='¡Contraseña actualizada! Redirigiendo...';setTimeout(()=>location.href='/',2000)}}
+      else{{msg.style.color='#f87171';msg.textContent=d.detail||'Error'}}
+    }};
+    </script></body></html>"""
+    return HTMLResponse(html)
+
+
+@app.post("/reset-password", tags=["Auth"])
+def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Restablece la contraseña usando el token enviado por email."""
+    user = db.query(User).filter(User.reset_token == body.token).first()
+    if not user or not user.reset_token_expires or datetime.now(timezone.utc).timestamp() > user.reset_token_expires:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido o expirado")
+
+    user.hashed_password = hash_password(body.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    return {"message": "Contraseña actualizada correctamente"}
 
 
 # ── API endpoints ─────────────────────────────────────────────────────────────
@@ -116,6 +233,9 @@ async def websocket_endpoint(
     if not user:
         await websocket.close(code=4001)
         return
+    if not user.is_verified:
+        await websocket.close(code=4003)
+        return
 
     session_id = str(uuid.uuid4())
     await manager.connect(websocket, session_id)
@@ -147,3 +267,19 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
         manager.disconnect(session_id)
         await manager.broadcast({"type": "remove", "id": session_id})
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _page(title: str, message: str, error: bool = False) -> str:
+    color = "#f87171" if error else "#4ade80"
+    return f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>{title} — ColectivoU</title>
+    <style>*{{margin:0;padding:0;box-sizing:border-box}}
+    body{{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#f1f5f9;min-height:100vh;display:flex;align-items:center;justify-content:center}}
+    .card{{background:#1e293b;border-radius:1.25rem;padding:2.5rem 2rem;max-width:360px;width:90%;text-align:center}}
+    h1{{font-size:1.5rem;margin-bottom:1rem;color:{color}}}
+    a{{color:#818cf8}}</style></head>
+    <body><div class="card"><h1>{title}</h1><p>{message}</p>
+    <p style="margin-top:1.5rem"><a href="/">← Volver al inicio</a></p>
+    </div></body></html>"""

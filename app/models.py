@@ -29,6 +29,15 @@ class TokenResponse(BaseModel):
     user: UserOut
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
 # ── Location schemas ──────────────────────────────────────────────────────────
 
 class LocationUpdate(BaseModel):
