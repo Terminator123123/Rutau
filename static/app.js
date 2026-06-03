@@ -1,46 +1,135 @@
 const UNIGUAJIRA_COORDS = [11.5392, -72.9066];
 const MAX_PASSENGERS = 4;
-const CLUSTER_RADIUS_M = 30; // metros para agrupar marcadores
+const CLUSTER_RADIUS_M = 30;
 
 const STATUS_CYCLE = ["disponible", "lleno", "en camino"];
-const STATUS_LABELS = {
-  disponible: "Disponible",
-  lleno: "Lleno",
-  "en camino": "En camino",
-};
+const STATUS_LABELS = { disponible: "Disponible", lleno: "Lleno", "en camino": "En camino" };
 
-let map, ws, myRole, myName, myStatus, watchId;
+let map, ws, myStatus, watchId;
 let myId = null;
 let manualPassengers = 0;
 let lastLat = null, lastLng = null;
+let authToken = null;
+let currentUser = null;
 const markers = {};
+const clusterMarkers = {};
 
-// ── Name screen ───────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-function goToRole() {
-  const input = document.getElementById("name-input");
-  const name = input.value.trim();
-  if (!name) { input.focus(); return; }
-  myName = name;
-  document.getElementById("name-screen").classList.add("hidden");
-  document.getElementById("role-screen").classList.remove("hidden");
-  document.getElementById("greeting").textContent = "Hola, " + name;
+window.addEventListener("DOMContentLoaded", () => {
+  const saved = localStorage.getItem("cu_token");
+  const user  = localStorage.getItem("cu_user");
+  if (saved && user) {
+    authToken   = saved;
+    currentUser = JSON.parse(user);
+    startMap();
+  }
+});
+
+// ── Auth tabs ─────────────────────────────────────────────────────────────────
+
+function showTab(tab) {
+  const isLogin = tab === "login";
+  document.getElementById("login-form").classList.toggle("hidden", !isLogin);
+  document.getElementById("register-form").classList.toggle("hidden", isLogin);
+  document.querySelectorAll(".tab").forEach((t, i) => {
+    t.classList.toggle("active", isLogin ? i === 0 : i === 1);
+  });
 }
 
-// ── Session ───────────────────────────────────────────────────────────────────
+function selectRole(role) {
+  document.getElementById("reg-role").value = role;
+  document.getElementById("toggle-estudiante").classList.toggle("active", role === "estudiante");
+  document.getElementById("toggle-conductor").classList.toggle("active", role === "conductor");
+}
 
-function startSession(role) {
-  myRole = role;
-  myStatus = role === "conductor" ? "disponible" : null;
+// ── Login ─────────────────────────────────────────────────────────────────────
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email    = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl    = document.getElementById("login-error");
+  errEl.classList.add("hidden");
+
+  try {
+    const res = await fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.detail || "Credenciales incorrectas");
+    }
+    const data = await res.json();
+    saveSession(data);
+    startMap();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove("hidden");
+  }
+}
+
+// ── Register ──────────────────────────────────────────────────────────────────
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const name     = document.getElementById("reg-name").value.trim();
+  const email    = document.getElementById("reg-email").value.trim();
+  const password = document.getElementById("reg-password").value;
+  const role     = document.getElementById("reg-role").value;
+  const errEl    = document.getElementById("register-error");
+  errEl.classList.add("hidden");
+
+  try {
+    const res = await fetch("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.detail || "Error al registrarse");
+    }
+    const data = await res.json();
+    saveSession(data);
+    startMap();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove("hidden");
+  }
+}
+
+function saveSession(data) {
+  authToken   = data.access_token;
+  currentUser = data.user;
+  localStorage.setItem("cu_token", authToken);
+  localStorage.setItem("cu_user", JSON.stringify(currentUser));
+}
+
+function logout() {
+  localStorage.removeItem("cu_token");
+  localStorage.removeItem("cu_user");
+  cleanup();
+  document.getElementById("map-screen").classList.add("hidden");
+  document.getElementById("auth-screen").classList.remove("hidden");
+}
+
+// ── Map start ─────────────────────────────────────────────────────────────────
+
+function startMap() {
+  myStatus = currentUser.role === "conductor" ? "disponible" : null;
   manualPassengers = 0;
 
-  document.getElementById("role-screen").classList.add("hidden");
+  document.getElementById("auth-screen").classList.add("hidden");
   document.getElementById("map-screen").classList.remove("hidden");
 
   const badge = document.getElementById("role-badge");
-  badge.textContent = myName + " · " + (role === "estudiante" ? "Estudiante" : "Conductor");
+  const label = currentUser.role === "estudiante" ? "Estudiante" : "Conductor";
+  badge.textContent = currentUser.name + " · " + label;
 
-  if (role === "conductor") {
+  if (currentUser.role === "conductor") {
     document.getElementById("btn-status").classList.remove("hidden");
     document.getElementById("passenger-counter").classList.remove("hidden");
     updateStatusButton();
@@ -51,17 +140,7 @@ function startSession(role) {
   requestLocation();
 }
 
-function changeRole() {
-  cleanup();
-  myStatus = null;
-  manualPassengers = 0;
-  document.getElementById("btn-status").classList.add("hidden");
-  document.getElementById("passenger-counter").classList.add("hidden");
-  document.getElementById("map-screen").classList.add("hidden");
-  document.getElementById("role-screen").classList.remove("hidden");
-}
-
-// ── Status (conductor) ────────────────────────────────────────────────────────
+// ── Status ────────────────────────────────────────────────────────────────────
 
 function cycleStatus() {
   const idx = STATUS_CYCLE.indexOf(myStatus);
@@ -75,8 +154,7 @@ function updateStatusButton() {
   btn.textContent = STATUS_LABELS[myStatus];
   btn.className = "";
   btn.id = "btn-status";
-  const cls = myStatus === "en camino" ? "en-camino" : myStatus;
-  btn.classList.add(cls);
+  btn.classList.add(myStatus === "en camino" ? "en-camino" : myStatus);
 }
 
 // ── Passenger counter ─────────────────────────────────────────────────────────
@@ -143,11 +221,14 @@ function startWatching() {
 
 function connectWS(lat, lng) {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws = new WebSocket(`${proto}://${location.host}/ws?token=${authToken}`);
   ws.onopen  = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
-  ws.onclose   = () => setStatus("connecting", "Reconectando...");
-  ws.onerror   = () => setStatus("error", "Error de conexion");
+  ws.onclose   = (e) => {
+    if (e.code === 4001) { logout(); return; }
+    setStatus("connecting", "Reconectando...");
+  };
+  ws.onerror = () => setStatus("error", "Error de conexion");
 }
 
 function sendLocation(lat, lng) {
@@ -157,10 +238,8 @@ function sendLocation(lat, lng) {
     ws.send(JSON.stringify({
       lat,
       lng,
-      role: myRole,
-      name: myName,
       status: myStatus,
-      manual_passengers: myRole === "conductor" ? manualPassengers : 0,
+      manual_passengers: currentUser.role === "conductor" ? manualPassengers : 0,
     }));
   }
 }
@@ -171,13 +250,12 @@ function handleMessage(msg) {
   if (msg.type === "snapshot") {
     msg.users.forEach(addOrUpdateMarker);
   } else if (msg.type === "update") {
-    if (!myId && msg.user.name === myName && msg.user.role === myRole) {
+    if (!myId && msg.user.name === currentUser.name && msg.user.role === currentUser.role) {
       myId = msg.user.id;
     }
     addOrUpdateMarker(msg.user);
 
-    // sync status if server auto-set to lleno
-    if (msg.user.id === myId && myRole === "conductor") {
+    if (msg.user.id === myId && currentUser.role === "conductor") {
       if (msg.user.status !== myStatus) {
         myStatus = msg.user.status;
         updateStatusButton();
@@ -192,15 +270,15 @@ function handleMessage(msg) {
 // ── Markers ───────────────────────────────────────────────────────────────────
 
 function markerColor(user) {
-  if (user.role === "estudiante") return "#0ea5e9";
-  if (user.status === "lleno")      return "#ef4444";
-  if (user.status === "en camino")  return "#eab308";
+  if (user.role === "estudiante")     return "#0ea5e9";
+  if (user.status === "lleno")        return "#ef4444";
+  if (user.status === "en camino")    return "#eab308";
   return "#f97316";
 }
 
 function buildIcon(user, isMe) {
-  const color = markerColor(user);
-  const size  = isMe ? 26 : 18;
+  const color  = markerColor(user);
+  const size   = isMe ? 26 : 18;
   const radius = user.role === "estudiante" ? "50%" : "4px";
   const ring   = isMe
     ? "box-shadow:0 0 0 4px rgba(255,255,255,0.2),0 2px 8px rgba(0,0,0,0.5);"
@@ -208,45 +286,31 @@ function buildIcon(user, isMe) {
   return L.divIcon({
     className: "",
     html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:${radius};border:3px solid #fff;${ring}"></div>`,
-    iconSize:   [size, size],
-    iconAnchor: [size / 2, size / 2],
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
   });
 }
 
 function buildPopup(user) {
   const isMe    = user.id === myId;
   const elapsed = elapsedTime(user.connected_at);
-
   let statusHtml = "";
   if (user.role === "conductor" && user.status) {
     const cls = user.status === "en camino" ? "en-camino" : user.status;
     statusHtml = `<div class="popup-status ${cls}">${STATUS_LABELS[user.status]}</div>`;
   }
-
-  let passengerHtml = "";
-  if (user.role === "conductor") {
-    const total = user.onboard_count || 0;
-    passengerHtml = `<div class="popup-info">${total}/${MAX_PASSENGERS} pasajeros</div>`;
-  }
-
+  const passengerHtml = user.role === "conductor"
+    ? `<div class="popup-info">${user.onboard_count || 0}/${MAX_PASSENGERS} pasajeros</div>` : "";
   const timeHtml = user.role === "estudiante"
     ? `<div class="popup-info">Esperando ${elapsed}</div>`
     : `<div class="popup-info">Activo hace ${elapsed}</div>`;
-
-  return `
-    <div class="popup-name">${user.name}${isMe ? " (tu)" : ""}</div>
-    ${timeHtml}
-    ${passengerHtml}
-    ${statusHtml}
-  `;
+  return `<div class="popup-name">${user.name}${isMe ? " (tu)" : ""}</div>${timeHtml}${passengerHtml}${statusHtml}`;
 }
 
 function elapsedTime(ts) {
   const secs = Math.floor(Date.now() / 1000 - ts);
   if (secs < 60) return secs + " seg";
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return mins + " min";
-  return Math.floor(mins / 60) + " h";
+  return mins < 60 ? mins + " min" : Math.floor(mins / 60) + " h";
 }
 
 function addOrUpdateMarker(user) {
@@ -257,11 +321,10 @@ function addOrUpdateMarker(user) {
     markers[user.id].setPopupContent(buildPopup(user));
     markers[user.id]._userData = user;
   } else {
-    const marker = L.marker([user.lat, user.lng], { icon: buildIcon(user, isMe) })
-      .addTo(map)
-      .bindPopup(buildPopup(user));
-    marker._userData = user;
-    markers[user.id] = marker;
+    const m = L.marker([user.lat, user.lng], { icon: buildIcon(user, isMe) })
+      .addTo(map).bindPopup(buildPopup(user));
+    m._userData = user;
+    markers[user.id] = m;
   }
   refreshClusters();
 }
@@ -272,28 +335,23 @@ function removeMarker(id) {
 }
 
 // ── Clustering ────────────────────────────────────────────────────────────────
-// clusterMarkers are separate from individual markers — keyed by cluster id string
-
-const clusterMarkers = {};
 
 function haversineJS(lat1, lng1, lat2, lng2) {
   const R = 6371000;
-  const phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;
-  const dphi = (lat2 - lat1) * Math.PI / 180;
-  const dlam = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
+  const p1 = lat1 * Math.PI / 180, p2 = lat2 * Math.PI / 180;
+  const dp = (lat2 - lat1) * Math.PI / 180, dl = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function refreshClusters() {
   if (!map) return;
-  const users = Object.values(markers).map((m) => m._userData).filter(Boolean);
+  const students = Object.values(markers)
+    .map((m) => m._userData)
+    .filter((u) => u && u.role === "estudiante");
 
-  // simple greedy clustering — group students only
-  const students = users.filter((u) => u.role === "estudiante");
   const visited = new Set();
-  const groups = [];
-
+  const groups  = [];
   for (const u of students) {
     if (visited.has(u.id)) continue;
     const group = [u];
@@ -301,58 +359,37 @@ function refreshClusters() {
     for (const v of students) {
       if (visited.has(v.id)) continue;
       if (haversineJS(u.lat, u.lng, v.lat, v.lng) <= CLUSTER_RADIUS_M) {
-        group.push(v);
-        visited.add(v.id);
+        group.push(v); visited.add(v.id);
       }
     }
     groups.push(group);
   }
 
-  // clear old clusters
   Object.values(clusterMarkers).forEach((m) => m.remove());
   Object.keys(clusterMarkers).forEach((k) => delete clusterMarkers[k]);
 
+  const inCluster = new Set();
   for (const group of groups) {
-    if (group.length < 2) continue; // solo 1 persona → marcador normal
+    if (group.length < 2) continue;
+    group.forEach((u) => { inCluster.add(u.id); if (markers[u.id]) markers[u.id].setOpacity(0); });
 
-    // hide individual markers in this group
-    group.forEach((u) => {
-      if (markers[u.id]) markers[u.id].setOpacity(0);
-    });
-
-    const centerLat = group.reduce((s, u) => s + u.lat, 0) / group.length;
-    const centerLng = group.reduce((s, u) => s + u.lng, 0) / group.length;
+    const cLat = group.reduce((s, u) => s + u.lat, 0) / group.length;
+    const cLng = group.reduce((s, u) => s + u.lng, 0) / group.length;
     const count = group.length;
-    const clusterKey = group.map((u) => u.id).sort().join("-");
+    const key   = group.map((u) => u.id).sort().join("-");
+    const sz    = Math.min(14 + count * 8, 48);
 
     const icon = L.divIcon({
       className: "",
-      html: `<div style="
-        background:#0ea5e9;
-        width:${Math.min(14 + count * 8, 48)}px;
-        height:${Math.min(14 + count * 8, 48)}px;
-        border-radius:50%;
-        border:3px solid #fff;
-        box-shadow:0 2px 8px rgba(0,0,0,0.4);
-        display:flex;align-items:center;justify-content:center;
-        font-size:0.75rem;font-weight:800;color:#fff;
-      ">${count}</div>`,
-      iconSize:   [48, 48],
-      iconAnchor: [24, 24],
+      html: `<div style="background:#0ea5e9;width:${sz}px;height:${sz}px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800;color:#fff">${count}</div>`,
+      iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2],
     });
-
     const names = group.map((u) => u.name).join(", ");
-    const cm = L.marker([centerLat, centerLng], { icon })
+    clusterMarkers[key] = L.marker([cLat, cLng], { icon })
       .addTo(map)
       .bindPopup(`<div class="popup-name">${count} estudiantes</div><div class="popup-info">${names}</div>`);
-
-    clusterMarkers[clusterKey] = cm;
   }
 
-  // show individual markers not in a multi-person cluster
-  const inCluster = new Set(
-    groups.filter((g) => g.length >= 2).flatMap((g) => g.map((u) => u.id))
-  );
   students.forEach((u) => {
     if (!inCluster.has(u.id) && markers[u.id]) markers[u.id].setOpacity(1);
   });
@@ -370,7 +407,7 @@ function cleanup() {
   if (ws) ws.close();
   Object.values(markers).forEach((m) => m.remove());
   Object.keys(markers).forEach((k) => delete markers[k]);
-  myId = null;
-  lastLat = null;
-  lastLng = null;
+  Object.values(clusterMarkers).forEach((m) => m.remove());
+  Object.keys(clusterMarkers).forEach((k) => delete clusterMarkers[k]);
+  myId = null; lastLat = null; lastLng = null;
 }
