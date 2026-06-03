@@ -1,11 +1,14 @@
 import json
 import os
+import secrets as _secrets
 import time
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, Request, status
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
@@ -32,16 +35,87 @@ from app.auth import (
 )
 
 _is_prod = os.getenv("DB_URL", "").startswith("postgresql")
+_basic = HTTPBasic()
 
 app = FastAPI(
     title="ColectivoU",
     description="API de coordinacion de transporte colectivo en tiempo real — Universidad de La Guajira",
     version="1.0.0",
-    docs_url=None if _is_prod else "/docs",
-    redoc_url=None if _is_prod else "/redoc",
+    docs_url=None,
+    redoc_url=None,
 )
 
+
+def _require_admin(credentials: HTTPBasicCredentials = Depends(_basic)):
+    admin_user = os.getenv("ADMIN_USER", "admin")
+    admin_pass = os.getenv("ADMIN_PASSWORD", "colectivou2026")
+    ok = (
+        _secrets.compare_digest(credentials.username.encode(), admin_user.encode()) and
+        _secrets.compare_digest(credentials.password.encode(), admin_pass.encode())
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            headers={"WWW-Authenticate": "Basic"},
+            detail="Acceso denegado",
+        )
+    return credentials
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# ── Protected docs ────────────────────────────────────────────────────────────
+
+@app.get("/docs", include_in_schema=False)
+async def docs(_=Depends(_require_admin)):
+    return get_swagger_ui_html(openapi_url="/openapi.json", title="ColectivoU · Docs")
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def openapi(_=Depends(_require_admin)):
+    return app.openapi()
+
+
+# ── Admin endpoints ───────────────────────────────────────────────────────────
+
+@app.get("/admin/users", tags=["Admin"])
+def admin_list_users(db: Session = Depends(get_db), _=Depends(_require_admin)):
+    """Lista todos los usuarios registrados."""
+    users = db.query(User).order_by(User.id).all()
+    return [
+        {
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "role": u.role,
+            "is_verified": u.is_verified,
+            "has_reset_token": bool(u.reset_token),
+        }
+        for u in users
+    ]
+
+
+@app.delete("/admin/users/{email}", tags=["Admin"])
+def admin_delete_user(email: str, db: Session = Depends(get_db), _=Depends(_require_admin)):
+    """Elimina un usuario por email."""
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    db.delete(user)
+    db.commit()
+    return {"message": f"Usuario {email} eliminado"}
+
+
+@app.post("/admin/users/{email}/verify", tags=["Admin"])
+def admin_verify_user(email: str, db: Session = Depends(get_db), _=Depends(_require_admin)):
+    """Verifica manualmente la cuenta de un usuario."""
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    return {"message": f"Usuario {email} verificado", "user": {"id": user.id, "name": user.name}}
 
 
 # ── Static pages ──────────────────────────────────────────────────────────────
