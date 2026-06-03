@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -59,7 +59,7 @@ async def dev():
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/register", response_model=TokenResponse, tags=["Auth"])
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
     """Registra un nuevo usuario. Envía email de verificación antes de permitir el acceso."""
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ya registrado")
@@ -77,15 +77,19 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    try:
-        send_verification_email(user.email, user.name, token)
-    except Exception as e:
-        print(f"[EMAIL] Error enviando verificación: {e}")
+    background.add_task(_send_verification, user.email, user.name, token)
 
     return TokenResponse(
         access_token=create_token(user),
         user=UserOut(id=user.id, name=user.name, email=user.email, role=user.role),
     )
+
+
+def _send_verification(email: str, name: str, token: str):
+    try:
+        send_verification_email(email, name, token)
+    except Exception as e:
+        print(f"[EMAIL] Error enviando verificación a {email}: {e}")
 
 
 @app.get("/verify-email", include_in_schema=False)
@@ -122,8 +126,15 @@ def me(current_user: User = Depends(get_current_user)):
     return UserOut(id=current_user.id, name=current_user.name, email=current_user.email, role=current_user.role)
 
 
+def _send_reset(email: str, name: str, token: str):
+    try:
+        send_reset_email(email, name, token)
+    except Exception as e:
+        print(f"[EMAIL] Error enviando reset a {email}: {e}")
+
+
 @app.post("/forgot-password", tags=["Auth"])
-def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(body: ForgotPasswordRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
     """Envía un email con enlace para restablecer contraseña."""
     user = db.query(User).filter(User.email == body.email).first()
     # Respuesta genérica para no revelar si el email existe
@@ -132,10 +143,7 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
         user.reset_token = token
         user.reset_token_expires = datetime.now(timezone.utc).timestamp() + 1800  # 30 min
         db.commit()
-        try:
-            send_reset_email(user.email, user.name, token)
-        except Exception as e:
-            print(f"[EMAIL] Error enviando reset: {e}")
+        background.add_task(_send_reset, user.email, user.name, token)
 
     return {"message": "Si el email existe, recibirás un enlace para restablecer tu contraseña."}
 

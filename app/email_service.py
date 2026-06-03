@@ -23,10 +23,11 @@ def _send(to: str, subject: str, html: str) -> None:
     msg["To"] = to
     msg.attach(MIMEText(html, "html", "utf-8"))
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
         server.starttls()
         server.login(SMTP_USER, SMTP_PASSWORD)
         server.sendmail(SMTP_USER, to, msg.as_string())
+        print(f"[EMAIL] Enviado OK → {to}")
 
 
 def send_verification_email(to: str, name: str, token: str) -> None:
