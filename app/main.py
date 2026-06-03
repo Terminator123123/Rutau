@@ -20,6 +20,11 @@ async def index():
     return FileResponse("static/index.html")
 
 
+@app.get("/dev", include_in_schema=False)
+async def dev():
+    return FileResponse("static/dev.html")
+
+
 @app.get("/health", tags=["API"])
 async def health():
     """Estado del servidor."""
