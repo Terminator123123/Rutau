@@ -1,33 +1,38 @@
+import json
 import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+import urllib.request
 
 _public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 APP_URL = os.getenv("APP_URL") or (f"https://{_public_domain}" if _public_domain else "http://localhost:8000")
 
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FROM_ADDRESS = "ColectivoU <onboarding@resend.dev>"
+
 
 def _send(to: str, subject: str, html: str) -> None:
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"[EMAIL] Sin SMTP configurado — no se envió correo a {to}")
+    if not RESEND_API_KEY:
+        print(f"[EMAIL] Sin RESEND_API_KEY — correo no enviado a {to}")
         return
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"ColectivoU <{SMTP_USER}>"
-    msg["To"] = to
-    msg.attach(MIMEText(html, "html", "utf-8"))
+    payload = json.dumps({
+        "from": FROM_ADDRESS,
+        "to": [to],
+        "subject": subject,
+        "html": html,
+    }).encode("utf-8")
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, to, msg.as_string())
-        print(f"[EMAIL] Enviado OK → {to}")
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        print(f"[EMAIL] Enviado OK → {to} (status {resp.status})")
 
 
 def send_verification_email(to: str, name: str, token: str) -> None:
