@@ -5,12 +5,12 @@ import urllib.request
 _public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 APP_URL = os.getenv("APP_URL") or (f"https://{_public_domain}" if _public_domain else "http://localhost:8000")
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FROM_ADDRESS = "ColectivoU <onboarding@resend.dev>"
 
 
 def _send(to: str, subject: str, html: str) -> None:
-    if not RESEND_API_KEY:
+    api_key = os.getenv("RESEND_API_KEY", "")
+    if not api_key:
         print(f"[EMAIL] Sin RESEND_API_KEY — correo no enviado a {to}")
         return
 
@@ -25,14 +25,19 @@ def _send(to: str, subject: str, html: str) -> None:
         "https://api.resend.com/emails",
         data=payload,
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        print(f"[EMAIL] Enviado OK → {to} (status {resp.status})")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"[EMAIL] Enviado OK → {to} (status {resp.status})")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"[EMAIL] Error {e.code} de Resend → {body}")
+        raise
 
 
 def send_verification_email(to: str, name: str, token: str) -> None:
