@@ -7,7 +7,7 @@ from app.manager import manager
 from app.models import LocationUpdate, UserLocation
 
 app = FastAPI(
-    title="RutaU",
+    title="ColectivoU",
     description="API de coordinación de transporte colectivo en tiempo real — Universidad de La Guajira",
     version="1.0.0",
 )
@@ -28,7 +28,7 @@ async def dev():
 @app.get("/health", tags=["API"])
 async def health():
     """Estado del servidor."""
-    return {"status": "ok", "app": "RutaU"}
+    return {"status": "ok", "app": "ColectivoU"}
 
 
 @app.get("/usuarios/activos", tags=["API"])

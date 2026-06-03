@@ -1,10 +1,10 @@
-# RutaU
+# ColectivoU
 
 Aplicación web de coordinación de transporte colectivo entre conductores y estudiantes de la Universidad de La Guajira.
 
 ## Problema que resuelve
 
-Los estudiantes dependen de colectivos informales sin saber si hay uno disponible cerca. Los conductores tampoco saben dónde hay demanda concentrada. RutaU conecta en tiempo real a ambos actores en un mapa interactivo.
+Los estudiantes dependen de colectivos informales sin saber si hay uno disponible cerca. Los conductores tampoco saben dónde hay demanda concentrada. ColectivoU conecta en tiempo real a ambos actores en un mapa interactivo.
 
 ## Funcionalidades
 
