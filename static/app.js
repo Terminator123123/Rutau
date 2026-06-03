@@ -1,5 +1,6 @@
 const UNIGUAJIRA_COORDS = [11.5392, -72.9066];
 const MAX_PASSENGERS = 4;
+const CLUSTER_RADIUS_M = 30; // metros para agrupar marcadores
 
 const STATUS_CYCLE = ["disponible", "lleno", "en camino"];
 const STATUS_LABELS = {
@@ -254,16 +255,107 @@ function addOrUpdateMarker(user) {
     markers[user.id].setLatLng([user.lat, user.lng]);
     markers[user.id].setIcon(buildIcon(user, isMe));
     markers[user.id].setPopupContent(buildPopup(user));
-    return;
+    markers[user.id]._userData = user;
+  } else {
+    const marker = L.marker([user.lat, user.lng], { icon: buildIcon(user, isMe) })
+      .addTo(map)
+      .bindPopup(buildPopup(user));
+    marker._userData = user;
+    markers[user.id] = marker;
   }
-  const marker = L.marker([user.lat, user.lng], { icon: buildIcon(user, isMe) })
-    .addTo(map)
-    .bindPopup(buildPopup(user));
-  markers[user.id] = marker;
+  refreshClusters();
 }
 
 function removeMarker(id) {
   if (markers[id]) { markers[id].remove(); delete markers[id]; }
+  refreshClusters();
+}
+
+// ── Clustering ────────────────────────────────────────────────────────────────
+// clusterMarkers are separate from individual markers — keyed by cluster id string
+
+const clusterMarkers = {};
+
+function haversineJS(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;
+  const dphi = (lat2 - lat1) * Math.PI / 180;
+  const dlam = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function refreshClusters() {
+  if (!map) return;
+  const users = Object.values(markers).map((m) => m._userData).filter(Boolean);
+
+  // simple greedy clustering — group students only
+  const students = users.filter((u) => u.role === "estudiante");
+  const visited = new Set();
+  const groups = [];
+
+  for (const u of students) {
+    if (visited.has(u.id)) continue;
+    const group = [u];
+    visited.add(u.id);
+    for (const v of students) {
+      if (visited.has(v.id)) continue;
+      if (haversineJS(u.lat, u.lng, v.lat, v.lng) <= CLUSTER_RADIUS_M) {
+        group.push(v);
+        visited.add(v.id);
+      }
+    }
+    groups.push(group);
+  }
+
+  // clear old clusters
+  Object.values(clusterMarkers).forEach((m) => m.remove());
+  Object.keys(clusterMarkers).forEach((k) => delete clusterMarkers[k]);
+
+  for (const group of groups) {
+    if (group.length < 2) continue; // solo 1 persona → marcador normal
+
+    // hide individual markers in this group
+    group.forEach((u) => {
+      if (markers[u.id]) markers[u.id].setOpacity(0);
+    });
+
+    const centerLat = group.reduce((s, u) => s + u.lat, 0) / group.length;
+    const centerLng = group.reduce((s, u) => s + u.lng, 0) / group.length;
+    const count = group.length;
+    const clusterKey = group.map((u) => u.id).sort().join("-");
+
+    const icon = L.divIcon({
+      className: "",
+      html: `<div style="
+        background:#0ea5e9;
+        width:${Math.min(14 + count * 8, 48)}px;
+        height:${Math.min(14 + count * 8, 48)}px;
+        border-radius:50%;
+        border:3px solid #fff;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);
+        display:flex;align-items:center;justify-content:center;
+        font-size:0.75rem;font-weight:800;color:#fff;
+      ">${count}</div>`,
+      iconSize:   [48, 48],
+      iconAnchor: [24, 24],
+    });
+
+    const names = group.map((u) => u.name).join(", ");
+    const cm = L.marker([centerLat, centerLng], { icon })
+      .addTo(map)
+      .bindPopup(`<div class="popup-name">${count} estudiantes</div><div class="popup-info">${names}</div>`);
+
+    clusterMarkers[clusterKey] = cm;
+  }
+
+  // show individual markers not in a multi-person cluster
+  const inCluster = new Set(
+    groups.filter((g) => g.length >= 2).flatMap((g) => g.map((u) => u.id))
+  );
+  students.forEach((u) => {
+    if (!inCluster.has(u.id) && markers[u.id]) markers[u.id].setOpacity(1);
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
