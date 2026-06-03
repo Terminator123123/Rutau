@@ -1,29 +1,47 @@
+import json
 import os
-import resend
+import urllib.request
+import urllib.error
 
 _public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 APP_URL = os.getenv("APP_URL") or (f"https://{_public_domain}" if _public_domain else "http://localhost:8000")
 
-FROM_ADDRESS = "ColectivoU <onboarding@resend.dev>"
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+FROM_NAME = "ColectivoU"
+FROM_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "shalemr83@gmail.com")
 
 
 def _send(to: str, subject: str, html: str) -> None:
-    api_key = os.getenv("RESEND_API_KEY", "")
+    api_key = os.getenv("BREVO_API_KEY", "")
     if not api_key:
-        print(f"[EMAIL] Sin RESEND_API_KEY — correo no enviado a {to}")
+        print(f"[EMAIL] Sin BREVO_API_KEY — correo no enviado a {to}")
         return
 
-    resend.api_key = api_key
+    payload = json.dumps({
+        "sender": {"name": FROM_NAME, "email": FROM_EMAIL},
+        "to": [{"email": to}],
+        "subject": subject,
+        "htmlContent": html,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        BREVO_API_URL,
+        data=payload,
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+
     try:
-        r = resend.Emails.send({
-            "from": FROM_ADDRESS,
-            "to": [to],
-            "subject": subject,
-            "html": html,
-        })
-        print(f"[EMAIL] Enviado OK → {to} | id={r.get('id')}")
-    except Exception as e:
-        print(f"[EMAIL] Error Resend → {e}")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = json.loads(resp.read())
+            print(f"[EMAIL] Enviado OK → {to} | messageId={body.get('messageId')}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"[EMAIL] Error {e.code} de Brevo → {body}")
         raise
 
 
