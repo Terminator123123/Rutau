@@ -10,9 +10,6 @@ if _db_url.startswith("postgres://"):
 
 _connect_args = {"check_same_thread": False} if _db_url.startswith("sqlite") else {}
 
-_db_type = "postgresql" if _db_url.startswith("postgresql") else "sqlite"
-print(f"[DB] Connecting to: {_db_type}", flush=True)
-
 engine = create_engine(_db_url, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -28,12 +25,7 @@ class User(Base):
     role = Column(String, nullable=False)  # "estudiante" | "conductor"
 
 
-try:
-    Base.metadata.create_all(bind=engine)
-    print(f"[DB] Tables created/verified OK ({_db_type})", flush=True)
-except Exception as e:
-    print(f"[DB] ERROR creating tables: {e}", flush=True)
-    raise
+Base.metadata.create_all(bind=engine)
 
 
 def get_db():
