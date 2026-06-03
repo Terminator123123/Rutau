@@ -1,4 +1,5 @@
 const UNIGUAJIRA_COORDS = [11.5392, -72.9066];
+const MAX_PASSENGERS = 4;
 
 const STATUS_CYCLE = ["disponible", "lleno", "en camino"];
 const STATUS_LABELS = {
@@ -8,29 +9,29 @@ const STATUS_LABELS = {
 };
 
 let map, ws, myRole, myName, myStatus, watchId;
-const markers = {};
 let myId = null;
+let manualPassengers = 0;
+let lastLat = null, lastLng = null;
+const markers = {};
 
-// ── Name screen ──────────────────────────────────────────────────────────────
+// ── Name screen ───────────────────────────────────────────────────────────────
 
 function goToRole() {
   const input = document.getElementById("name-input");
   const name = input.value.trim();
-  if (!name) {
-    input.focus();
-    return;
-  }
+  if (!name) { input.focus(); return; }
   myName = name;
   document.getElementById("name-screen").classList.add("hidden");
   document.getElementById("role-screen").classList.remove("hidden");
   document.getElementById("greeting").textContent = "Hola, " + name;
 }
 
-// ── Session start ─────────────────────────────────────────────────────────────
+// ── Session ───────────────────────────────────────────────────────────────────
 
 function startSession(role) {
   myRole = role;
   myStatus = role === "conductor" ? "disponible" : null;
+  manualPassengers = 0;
 
   document.getElementById("role-screen").classList.add("hidden");
   document.getElementById("map-screen").classList.remove("hidden");
@@ -39,9 +40,10 @@ function startSession(role) {
   badge.textContent = myName + " · " + (role === "estudiante" ? "Estudiante" : "Conductor");
 
   if (role === "conductor") {
-    const btn = document.getElementById("btn-status");
-    btn.classList.remove("hidden");
+    document.getElementById("btn-status").classList.remove("hidden");
+    document.getElementById("passenger-counter").classList.remove("hidden");
     updateStatusButton();
+    updateCounterDisplay(0);
   }
 
   initMap();
@@ -51,35 +53,58 @@ function startSession(role) {
 function changeRole() {
   cleanup();
   myStatus = null;
+  manualPassengers = 0;
   document.getElementById("btn-status").classList.add("hidden");
+  document.getElementById("passenger-counter").classList.add("hidden");
   document.getElementById("map-screen").classList.add("hidden");
   document.getElementById("role-screen").classList.remove("hidden");
 }
 
-// ── Status (conductor only) ───────────────────────────────────────────────────
+// ── Status (conductor) ────────────────────────────────────────────────────────
 
 function cycleStatus() {
   const idx = STATUS_CYCLE.indexOf(myStatus);
   myStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
   updateStatusButton();
-  sendLocation._last && sendLocation(...sendLocation._last);
+  if (lastLat !== null) sendLocation(lastLat, lastLng);
 }
 
 function updateStatusButton() {
   const btn = document.getElementById("btn-status");
   btn.textContent = STATUS_LABELS[myStatus];
-  btn.className = "btn-status-class";
-  btn.classList.remove("disponible", "lleno", "en-camino");
-  btn.classList.add(myStatus === "en camino" ? "en-camino" : myStatus);
+  btn.className = "";
+  btn.id = "btn-status";
+  const cls = myStatus === "en camino" ? "en-camino" : myStatus;
+  btn.classList.add(cls);
+}
+
+// ── Passenger counter ─────────────────────────────────────────────────────────
+
+function addManual() {
+  if (manualPassengers < MAX_PASSENGERS) {
+    manualPassengers++;
+    if (lastLat !== null) sendLocation(lastLat, lastLng);
+  }
+}
+
+function removeManual() {
+  if (manualPassengers > 0) {
+    manualPassengers--;
+    if (lastLat !== null) sendLocation(lastLat, lastLng);
+  }
+}
+
+function updateCounterDisplay(total) {
+  const el = document.getElementById("counter-display");
+  el.textContent = total + "/" + MAX_PASSENGERS;
+  el.className = total >= MAX_PASSENGERS ? "full" : "";
 }
 
 // ── Map ───────────────────────────────────────────────────────────────────────
 
 function initMap() {
   if (map) { map.remove(); map = null; }
-
   map = L.map("map").setView(UNIGUAJIRA_COORDS, 15);
-
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap &copy; CARTO",
     maxZoom: 19,
@@ -89,10 +114,7 @@ function initMap() {
 // ── Geolocation ───────────────────────────────────────────────────────────────
 
 function requestLocation() {
-  if (!navigator.geolocation) {
-    setStatus("error", "GPS no disponible");
-    return;
-  }
+  if (!navigator.geolocation) { setStatus("error", "GPS no disponible"); return; }
   setStatus("connecting", "Obteniendo ubicacion...");
   navigator.geolocation.getCurrentPosition(
     (pos) => {
@@ -121,19 +143,15 @@ function startWatching() {
 function connectWS(lat, lng) {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-
-  ws.onopen = () => {
-    setStatus("connected", "En vivo");
-    sendLocation(lat, lng);
-  };
-
-  ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+  ws.onopen  = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
+  ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
   ws.onclose   = () => setStatus("connecting", "Reconectando...");
   ws.onerror   = () => setStatus("error", "Error de conexion");
 }
 
 function sendLocation(lat, lng) {
-  sendLocation._last = [lat, lng];
+  lastLat = lat;
+  lastLng = lng;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       lat,
@@ -141,21 +159,30 @@ function sendLocation(lat, lng) {
       role: myRole,
       name: myName,
       status: myStatus,
+      manual_passengers: myRole === "conductor" ? manualPassengers : 0,
     }));
   }
 }
 
-// ── Message handling ──────────────────────────────────────────────────────────
+// ── Messages ──────────────────────────────────────────────────────────────────
 
 function handleMessage(msg) {
   if (msg.type === "snapshot") {
     msg.users.forEach(addOrUpdateMarker);
   } else if (msg.type === "update") {
-    // first update from server reveals our own id
     if (!myId && msg.user.name === myName && msg.user.role === myRole) {
       myId = msg.user.id;
     }
     addOrUpdateMarker(msg.user);
+
+    // sync status if server auto-set to lleno
+    if (msg.user.id === myId && myRole === "conductor") {
+      if (msg.user.status !== myStatus) {
+        myStatus = msg.user.status;
+        updateStatusButton();
+      }
+      updateCounterDisplay(msg.user.onboard_count);
+    }
   } else if (msg.type === "remove") {
     removeMarker(msg.id);
   }
@@ -165,27 +192,28 @@ function handleMessage(msg) {
 
 function markerColor(user) {
   if (user.role === "estudiante") return "#0ea5e9";
-  if (user.status === "lleno") return "#ef4444";
-  if (user.status === "en camino") return "#eab308";
+  if (user.status === "lleno")      return "#ef4444";
+  if (user.status === "en camino")  return "#eab308";
   return "#f97316";
 }
 
 function buildIcon(user, isMe) {
   const color = markerColor(user);
-  const size = isMe ? 26 : 18;
+  const size  = isMe ? 26 : 18;
   const radius = user.role === "estudiante" ? "50%" : "4px";
-  const ring = isMe ? `box-shadow:0 0 0 4px rgba(255,255,255,0.2),0 2px 8px rgba(0,0,0,0.5);` : `box-shadow:0 2px 6px rgba(0,0,0,0.4);`;
-
+  const ring   = isMe
+    ? "box-shadow:0 0 0 4px rgba(255,255,255,0.2),0 2px 8px rgba(0,0,0,0.5);"
+    : "box-shadow:0 2px 6px rgba(0,0,0,0.4);";
   return L.divIcon({
     className: "",
     html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:${radius};border:3px solid #fff;${ring}"></div>`,
-    iconSize: [size, size],
+    iconSize:   [size, size],
     iconAnchor: [size / 2, size / 2],
   });
 }
 
 function buildPopup(user) {
-  const isMe = user.id === myId;
+  const isMe    = user.id === myId;
   const elapsed = elapsedTime(user.connected_at);
 
   let statusHtml = "";
@@ -194,13 +222,20 @@ function buildPopup(user) {
     statusHtml = `<div class="popup-status ${cls}">${STATUS_LABELS[user.status]}</div>`;
   }
 
-  const waitHtml = user.role === "estudiante"
+  let passengerHtml = "";
+  if (user.role === "conductor") {
+    const total = user.onboard_count || 0;
+    passengerHtml = `<div class="popup-info">${total}/${MAX_PASSENGERS} pasajeros</div>`;
+  }
+
+  const timeHtml = user.role === "estudiante"
     ? `<div class="popup-info">Esperando ${elapsed}</div>`
     : `<div class="popup-info">Activo hace ${elapsed}</div>`;
 
   return `
     <div class="popup-name">${user.name}${isMe ? " (tu)" : ""}</div>
-    ${waitHtml}
+    ${timeHtml}
+    ${passengerHtml}
     ${statusHtml}
   `;
 }
@@ -215,29 +250,23 @@ function elapsedTime(ts) {
 
 function addOrUpdateMarker(user) {
   const isMe = user.id === myId;
-
   if (markers[user.id]) {
     markers[user.id].setLatLng([user.lat, user.lng]);
     markers[user.id].setIcon(buildIcon(user, isMe));
     markers[user.id].setPopupContent(buildPopup(user));
     return;
   }
-
   const marker = L.marker([user.lat, user.lng], { icon: buildIcon(user, isMe) })
     .addTo(map)
     .bindPopup(buildPopup(user));
-
   markers[user.id] = marker;
 }
 
 function removeMarker(id) {
-  if (markers[id]) {
-    markers[id].remove();
-    delete markers[id];
-  }
+  if (markers[id]) { markers[id].remove(); delete markers[id]; }
 }
 
-// ── UI helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function setStatus(state, text) {
   document.getElementById("status-dot").className = `dot ${state}`;
@@ -250,4 +279,6 @@ function cleanup() {
   Object.values(markers).forEach((m) => m.remove());
   Object.keys(markers).forEach((k) => delete markers[k]);
   myId = null;
+  lastLat = null;
+  lastLng = null;
 }

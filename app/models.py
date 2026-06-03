@@ -8,6 +8,7 @@ class LocationUpdate(BaseModel):
     role: Literal["estudiante", "conductor"]
     name: str
     status: Optional[Literal["disponible", "lleno", "en camino"]] = None
+    manual_passengers: int = 0  # pasajeros sin app reportados por el conductor
 
 
 class UserLocation(BaseModel):
@@ -18,3 +19,5 @@ class UserLocation(BaseModel):
     name: str
     status: Optional[Literal["disponible", "lleno", "en camino"]] = None
     connected_at: float
+    manual_passengers: int = 0
+    onboard_count: int = 0      # calculado por el servidor (app + manuales)

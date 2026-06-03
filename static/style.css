@@ -143,6 +143,45 @@ body {
   font-size: 1rem;
 }
 
+/* Passenger counter (conductor only) */
+#passenger-counter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 2rem;
+  padding: 0.2rem 0.5rem;
+  flex-shrink: 0;
+}
+
+#counter-display {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+#counter-display.full {
+  color: #ef4444;
+}
+
+.btn-manual {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.btn-manual:hover { color: #f1f5f9; }
+.btn-manual.minus { color: #475569; }
+.btn-manual.minus:hover { color: #94a3b8; }
+
 /* Status button (conductor only) */
 #btn-status {
   padding: 0.3rem 0.85rem;
