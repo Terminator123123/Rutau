@@ -68,6 +68,7 @@ async function handleLogin(e) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Credenciales incorrectas");
+    setLoading(btn, false);
     saveSession(data);
     startMap();
   } catch (err) {
