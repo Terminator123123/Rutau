@@ -17,16 +17,18 @@
     <div id="topbar" class="hidden">
       <span id="role-badge"></span>
       <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
-      <div id="passenger-counter" class="hidden">
-        <span id="counter-display">0/4</span>
-        <button class="btn-manual" onclick="addManual()">+</button>
-        <button class="btn-manual" onclick="removeManual()">−</button>
+      <div id="topbar-right">
+        <span id="status-dot" class="dot connecting"></span>
+        <span id="status-text">Conectando...</span>
+        <button id="btn-logout" onclick="logout()">Salir</button>
       </div>
-      <span id="status-dot" class="dot connecting"></span>
-      <span id="status-text">Conectando...</span>
-      <button id="btn-logout" onclick="logout()">Salir</button>
     </div>
     <div id="map"></div>
+    <div id="passenger-counter" class="hidden">
+      <button class="btn-manual" onclick="removeManual()">−</button>
+      <span id="counter-display">0/4</span>
+      <button class="btn-manual" onclick="addManual()">+</button>
+    </div>
     <div id="legend" class="hidden">
       <span><span class="dot-legend blue"></span>Estudiantes</span>
       <span><span class="dot-legend orange"></span>Disponible</span>

@@ -289,8 +289,14 @@ html, body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  flex-wrap: wrap;
   font-family: var(--font);
+}
+
+#topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 #role-badge { font-size: 0.85rem; font-weight: 600; color: #f1f5f9; }
@@ -313,13 +319,20 @@ html, body {
 #btn-status.en-camino  { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.35); color: #fbbf24; }
 
 #passenger-counter {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  background: rgba(255,255,255,0.06);
+  gap: 0.35rem;
+  background: rgba(7, 11, 18, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 20px;
-  padding: 0.2rem 0.45rem;
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font);
 }
 
 #counter-display { font-size: 0.75rem; font-weight: 600; min-width: 2.2rem; text-align: center; color: #f1f5f9; }
@@ -350,7 +363,6 @@ html, body {
 #status-text { font-size: 0.74rem; color: #94a3b8; font-weight: 400; }
 
 #btn-logout {
-  margin-left: auto;
   padding: 0.28rem 0.75rem;
   background: rgba(220,38,38,0.1);
   border: 1px solid rgba(220,38,38,0.22);
