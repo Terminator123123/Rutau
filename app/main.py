@@ -2,12 +2,13 @@ import json
 import os
 import secrets as _secrets
 import time
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -26,9 +27,12 @@ from app.models import (
     UserOut,
 )
 from app.auth import (
+    COOKIE_NAME,
+    INFO_COOKIE_NAME,
+    TOKEN_EXPIRE_DAYS,
     generate_token,
     get_current_user,
-    get_user_from_token_str,
+    get_user_from_cookie,
     hash_password,
     verify_password,
     create_token,
@@ -132,31 +136,28 @@ async def dev():
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
-@app.post("/register", response_model=TokenResponse, tags=["Auth"])
-def register(body: RegisterRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
+@app.post("/register", response_model=UserOut, tags=["Auth"])
+def register(body: RegisterRequest, background: BackgroundTasks, response: Response, db: Session = Depends(get_db)):
     """Registra un nuevo usuario. Envía email de verificación antes de permitir el acceso."""
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ya registrado")
 
-    token = generate_token()
+    ver_token = generate_token()
     user = User(
         name=body.name,
         email=body.email,
         hashed_password=hash_password(body.password),
         role=body.role,
         is_verified=False,
-        verification_token=token,
+        verification_token=ver_token,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    background.add_task(_send_verification, user.email, user.name, token)
+    background.add_task(_send_verification, user.email, user.name, ver_token)
 
-    return TokenResponse(
-        access_token=create_token(user),
-        user=UserOut(id=user.id, name=user.name, email=user.email, role=user.role),
-    )
+    return UserOut(id=user.id, name=user.name, email=user.email, role=user.role)
 
 
 def _send_verification(email: str, name: str, token: str):
@@ -179,19 +180,45 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     return RedirectResponse(url="/?verified=1")
 
 
-@app.post("/login", response_model=TokenResponse, tags=["Auth"])
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    """Inicia sesión. El usuario debe haber verificado su email."""
+@app.post("/login", response_model=UserOut, tags=["Auth"])
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    """Inicia sesión. Establece cookie de sesión por 7 días."""
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales incorrectas")
     if not user.is_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta no verificada. Revisa tu correo.")
 
-    return TokenResponse(
-        access_token=create_token(user),
-        user=UserOut(id=user.id, name=user.name, email=user.email, role=user.role),
+    _max_age = TOKEN_EXPIRE_DAYS * 24 * 3600
+
+    # Cookie segura (HttpOnly) con JWT — la usa el servidor para autenticar WebSocket
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=create_token(user),
+        httponly=True,
+        secure=_is_prod,
+        samesite="lax",
+        max_age=_max_age,
     )
+    # Cookie legible por JS con nombre y rol — el frontend la lee directo sin llamar al servidor
+    _info = urllib.parse.quote(json.dumps({"name": user.name, "role": user.role, "id": user.id}))
+    response.set_cookie(
+        key=INFO_COOKIE_NAME,
+        value=_info,
+        httponly=False,
+        secure=_is_prod,
+        samesite="lax",
+        max_age=_max_age,
+    )
+    return UserOut(id=user.id, name=user.name, email=user.email, role=user.role)
+
+
+@app.post("/logout", tags=["Auth"])
+def logout(response: Response):
+    """Cierra sesión eliminando las cookies de sesión."""
+    response.delete_cookie(key=COOKIE_NAME)
+    response.delete_cookie(key=INFO_COOKIE_NAME)
+    return {"message": "Sesión cerrada"}
 
 
 @app.get("/me", response_model=UserOut, tags=["Auth"])
@@ -308,10 +335,10 @@ async def stats():
 @app.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    token: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    user = get_user_from_token_str(token, db)
+    cookie = websocket.cookies.get(COOKIE_NAME)
+    user = get_user_from_cookie(cookie, db)
     if not user:
         await websocket.close(code=4001)
         return

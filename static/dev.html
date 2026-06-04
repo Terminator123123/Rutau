@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ColectivoU</title>
+  <title>ColectivoU — Transporte universitario en tiempo real</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
@@ -11,9 +14,13 @@
 
   <!-- Auth screen -->
   <div id="auth-screen">
-    <div class="role-card">
-      <h1>ColectivoU</h1>
-      <p>Coordinacion de transporte en la Universidad de La Guajira</p>
+    <div class="auth-card">
+
+      <div class="auth-brand">
+        <div class="auth-logo">🚌</div>
+        <h1>ColectivoU</h1>
+        <p>Transporte universitario en tiempo real</p>
+      </div>
 
       <div class="auth-tabs">
         <button class="tab active" onclick="showTab('login')">Ingresar</button>
@@ -22,25 +29,49 @@
 
       <!-- Login form -->
       <form id="login-form" onsubmit="handleLogin(event)">
-        <input type="email" id="login-email" placeholder="Correo electronico" required />
-        <input type="password" id="login-password" placeholder="Contrasena" required />
-        <div id="login-error" class="form-error hidden"></div>
-        <button type="submit" class="btn-continue">Ingresar</button>
+        <div class="input-group">
+          <span class="input-icon">✉</span>
+          <input type="email" id="login-email" placeholder="Correo electrónico" required autocomplete="email" />
+        </div>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password" />
+        </div>
+        <div id="login-error" class="form-msg hidden"></div>
+        <button type="submit" class="btn-primary">Ingresar</button>
+        <button type="button" class="btn-link" onclick="showForgot()">¿Olvidaste tu contraseña?</button>
       </form>
 
       <!-- Register form -->
       <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
-        <input type="text" id="reg-name" placeholder="Nombre completo" required maxlength="40" />
-        <input type="email" id="reg-email" placeholder="Correo electronico" required />
-        <input type="password" id="reg-password" placeholder="Contrasena" required minlength="6" />
-        <div class="role-toggle">
-          <button type="button" id="toggle-estudiante" class="toggle-btn active" onclick="selectRole('estudiante')">Estudiante</button>
-          <button type="button" id="toggle-conductor" class="toggle-btn" onclick="selectRole('conductor')">Conductor</button>
+        <div class="input-group">
+          <span class="input-icon">👤</span>
+          <input type="text" id="reg-name" placeholder="Nombre completo" required maxlength="40" autocomplete="name" />
+        </div>
+        <div class="input-group">
+          <span class="input-icon">✉</span>
+          <input type="email" id="reg-email" placeholder="Correo electrónico" required autocomplete="email" />
+        </div>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="reg-password" placeholder="Contraseña (mín. 6 caracteres)" required minlength="6" />
+        </div>
+        <div class="role-select">
+          <p class="role-label">Soy…</p>
+          <div class="role-btns">
+            <button type="button" id="toggle-estudiante" class="role-opt active" onclick="selectRole('estudiante')">
+              <span>🎓</span> Estudiante
+            </button>
+            <button type="button" id="toggle-conductor" class="role-opt" onclick="selectRole('conductor')">
+              <span>🚌</span> Conductor
+            </button>
+          </div>
         </div>
         <input type="hidden" id="reg-role" value="estudiante" />
-        <div id="register-error" class="form-error hidden"></div>
-        <button type="submit" class="btn-continue">Crear cuenta</button>
+        <div id="register-msg" class="form-msg hidden"></div>
+        <button type="submit" class="btn-primary">Crear cuenta</button>
       </form>
+
     </div>
   </div>
 

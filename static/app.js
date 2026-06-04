@@ -9,22 +9,42 @@ let map, ws, myStatus, watchId;
 let myId = null;
 let manualPassengers = 0;
 let lastLat = null, lastLng = null;
-let authToken = null;
 let currentUser = null;
 const markers = {};
 const clusterMarkers = {};
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
+function readSessionCookie() {
+  const match = document.cookie.split("; ").find(r => r.startsWith("cu_info="));
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match.split("=")[1]));
+  } catch (_) {
+    return null;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
-  const saved = localStorage.getItem("cu_token");
-  const user  = localStorage.getItem("cu_user");
-  if (saved && user) {
-    authToken   = saved;
-    currentUser = JSON.parse(user);
+  const params = new URLSearchParams(location.search);
+  if (params.get("verified") === "1") {
+    showVerifiedBanner();
+  }
+  // Lee el rol y nombre del usuario directo desde la cookie del navegador — sin llamar al servidor
+  const saved = readSessionCookie();
+  if (saved) {
+    currentUser = saved;
     startMap();
   }
 });
+
+function showVerifiedBanner() {
+  const msg = document.getElementById("login-error");
+  if (msg) {
+    msg.className = "form-msg success";
+    msg.textContent = "¡Correo verificado! Ya puedes iniciar sesión.";
+  }
+}
 
 // ── Auth tabs ─────────────────────────────────────────────────────────────────
 
@@ -35,10 +55,10 @@ function showTab(tab) {
   document.querySelectorAll(".tab").forEach((t, i) => {
     t.classList.toggle("active", isLogin ? i === 0 : i === 1);
   });
-  // Reset error/success messages when switching tabs
-  ["login-error", "register-error"].forEach(id => {
+  ["login-error", "register-msg"].forEach(id => {
     const el = document.getElementById(id);
-    el.className = "form-error hidden";
+    if (!el) return;
+    el.className = "form-msg hidden";
     el.textContent = "";
   });
 }
@@ -49,6 +69,28 @@ function selectRole(role) {
   document.getElementById("toggle-conductor").classList.toggle("active", role === "conductor");
 }
 
+function showForgot() {
+  const errEl = document.getElementById("login-error");
+  const email = document.getElementById("login-email").value.trim();
+  if (!email) {
+    errEl.className = "form-msg error";
+    errEl.textContent = "Ingresa tu correo primero.";
+    return;
+  }
+  errEl.className = "form-msg hidden";
+  fetch("/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  }).then(() => {
+    errEl.className = "form-msg success";
+    errEl.textContent = "Si el correo existe, recibirás un enlace para restablecer tu contraseña.";
+  }).catch(() => {
+    errEl.className = "form-msg error";
+    errEl.textContent = "Error al enviar. Intenta de nuevo.";
+  });
+}
+
 // ── Login ─────────────────────────────────────────────────────────────────────
 
 async function handleLogin(e) {
@@ -57,23 +99,24 @@ async function handleLogin(e) {
   const password = document.getElementById("login-password").value;
   const errEl    = document.getElementById("login-error");
   const btn      = e.target.querySelector("button[type=submit]");
-  errEl.classList.add("hidden");
+  errEl.className = "form-msg hidden";
 
   setLoading(btn, true);
   try {
     const res = await fetch("/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Credenciales incorrectas");
+    currentUser = data;
     setLoading(btn, false);
-    saveSession(data);
     startMap();
   } catch (err) {
+    errEl.className = "form-msg error";
     errEl.textContent = err.message;
-    errEl.classList.remove("hidden");
     setLoading(btn, false);
   }
 }
@@ -86,44 +129,38 @@ async function handleRegister(e) {
   const email    = document.getElementById("reg-email").value.trim();
   const password = document.getElementById("reg-password").value;
   const role     = document.getElementById("reg-role").value;
-  const errEl    = document.getElementById("register-error");
+  const msgEl    = document.getElementById("register-msg");
   const btn      = e.target.querySelector("button[type=submit]");
-  errEl.classList.add("hidden");
+  msgEl.className = "form-msg hidden";
 
   setLoading(btn, true);
   try {
     const res = await fetch("/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ name, email, password, role }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Error al registrarse");
 
-    // Account created but needs email verification before accessing the map
-    errEl.className = "form-success";
-    errEl.textContent = "¡Cuenta creada! Revisa tu correo y haz clic en el enlace de verificación para ingresar.";
-    errEl.classList.remove("hidden");
+    msgEl.className = "form-msg success";
+    msgEl.textContent = "¡Cuenta creada! Revisa tu correo y haz clic en el enlace de verificación para ingresar.";
     e.target.reset();
+    selectRole("estudiante");
     setLoading(btn, false);
   } catch (err) {
-    errEl.className = "form-error";
-    errEl.textContent = err.message;
-    errEl.classList.remove("hidden");
+    msgEl.className = "form-msg error";
+    msgEl.textContent = err.message;
     setLoading(btn, false);
   }
 }
 
-function saveSession(data) {
-  authToken   = data.access_token;
-  currentUser = data.user;
-  localStorage.setItem("cu_token", authToken);
-  localStorage.setItem("cu_user", JSON.stringify(currentUser));
-}
-
-function logout() {
-  localStorage.removeItem("cu_token");
-  localStorage.removeItem("cu_user");
+async function logout() {
+  try {
+    await fetch("/logout", { method: "POST", credentials: "include" });
+  } catch (_) {}
+  currentUser = null;
   cleanup();
   document.getElementById("map-screen").classList.add("hidden");
   document.getElementById("auth-screen").classList.remove("hidden");
@@ -234,7 +271,7 @@ function startWatching() {
 
 function connectWS(lat, lng) {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${proto}://${location.host}/ws?token=${authToken}`);
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen  = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
   ws.onclose   = (e) => {
@@ -433,4 +470,7 @@ function cleanup() {
   Object.values(clusterMarkers).forEach((m) => m.remove());
   Object.keys(clusterMarkers).forEach((k) => delete clusterMarkers[k]);
   myId = null; lastLat = null; lastLng = null;
+  manualPassengers = 0;
+  document.getElementById("btn-status").classList.add("hidden");
+  document.getElementById("passenger-counter").classList.add("hidden");
 }
