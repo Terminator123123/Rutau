@@ -4,7 +4,7 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --accent:  #e8a030;
+  --accent:  #7eb8d4;
   --text:    #edf2f9;
   --muted:   #64748b;
   --success: #3ec17a;
@@ -215,10 +215,10 @@ html, body {
   background: var(--accent);
   border: none;
   border-radius: 7px;
-  color: #0a0d14;
+  color: #07111c;
   font-family: var(--font);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
   transition: opacity 0.18s, transform 0.18s;
@@ -264,7 +264,7 @@ html, body {
 .bg-col {
   width: 10px;
   height: 10px;
-  background: #e8a030;
+  background: #94a3b8;
   transform: rotate(45deg);
   border-radius: 2px;
   opacity: 0.88;
