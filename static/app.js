@@ -169,6 +169,7 @@ async function logout() {
 // ── Map start ─────────────────────────────────────────────────────────────────
 
 function startMap() {
+  if (window.__stopBgAnim) window.__stopBgAnim();
   myStatus = currentUser.role === "conductor" ? "disponible" : null;
   manualPassengers = 0;
 

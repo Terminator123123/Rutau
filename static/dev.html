@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ColectivoU — Transporte universitario en tiempo real</title>
+  <title>ColectivoU</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
@@ -14,12 +14,14 @@
 
   <!-- Auth screen -->
   <div id="auth-screen">
-    <div class="auth-card">
+    <div id="bg-map"></div>
+    <div class="auth-overlay"></div>
 
+    <div class="auth-card">
       <div class="auth-brand">
-        <div class="auth-logo">🚌</div>
+        <div class="brand-mark">U</div>
         <h1>ColectivoU</h1>
-        <p>Transporte universitario en tiempo real</p>
+        <p>Transporte universitario · Riohacha</p>
       </div>
 
       <div class="auth-tabs">
@@ -27,51 +29,31 @@
         <button class="tab" onclick="showTab('register')">Registrarse</button>
       </div>
 
-      <!-- Login form -->
+      <!-- Login -->
       <form id="login-form" onsubmit="handleLogin(event)">
-        <div class="input-group">
-          <span class="input-icon">✉</span>
-          <input type="email" id="login-email" placeholder="Correo electrónico" required autocomplete="email" />
-        </div>
-        <div class="input-group">
-          <span class="input-icon">🔒</span>
-          <input type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password" />
-        </div>
+        <input type="email" id="login-email" placeholder="Correo electrónico" required autocomplete="email" />
+        <input type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password" />
         <div id="login-error" class="form-msg hidden"></div>
         <button type="submit" class="btn-primary">Ingresar</button>
         <button type="button" class="btn-link" onclick="showForgot()">¿Olvidaste tu contraseña?</button>
       </form>
 
-      <!-- Register form -->
+      <!-- Register -->
       <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
-        <div class="input-group">
-          <span class="input-icon">👤</span>
-          <input type="text" id="reg-name" placeholder="Nombre completo" required maxlength="40" autocomplete="name" />
-        </div>
-        <div class="input-group">
-          <span class="input-icon">✉</span>
-          <input type="email" id="reg-email" placeholder="Correo electrónico" required autocomplete="email" />
-        </div>
-        <div class="input-group">
-          <span class="input-icon">🔒</span>
-          <input type="password" id="reg-password" placeholder="Contraseña (mín. 6 caracteres)" required minlength="6" />
-        </div>
+        <input type="text" id="reg-name" placeholder="Nombre completo" required maxlength="40" autocomplete="name" />
+        <input type="email" id="reg-email" placeholder="Correo electrónico" required autocomplete="email" />
+        <input type="password" id="reg-password" placeholder="Contraseña (mín. 6 caracteres)" required minlength="6" />
         <div class="role-select">
-          <p class="role-label">Soy…</p>
+          <p class="role-label">Soy</p>
           <div class="role-btns">
-            <button type="button" id="toggle-estudiante" class="role-opt active" onclick="selectRole('estudiante')">
-              <span>🎓</span> Estudiante
-            </button>
-            <button type="button" id="toggle-conductor" class="role-opt" onclick="selectRole('conductor')">
-              <span>🚌</span> Conductor
-            </button>
+            <button type="button" id="toggle-estudiante" class="role-opt active" onclick="selectRole('estudiante')">Estudiante</button>
+            <button type="button" id="toggle-conductor" class="role-opt" onclick="selectRole('conductor')">Conductor</button>
           </div>
         </div>
         <input type="hidden" id="reg-role" value="estudiante" />
         <div id="register-msg" class="form-msg hidden"></div>
         <button type="submit" class="btn-primary">Crear cuenta</button>
       </form>
-
     </div>
   </div>
 
@@ -82,8 +64,8 @@
       <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
       <div id="passenger-counter" class="hidden">
         <span id="counter-display">0/4</span>
-        <button class="btn-manual" onclick="addManual()" title="Agregar pasajero sin app">+</button>
-        <button class="btn-manual minus" onclick="removeManual()" title="Quitar pasajero sin app">−</button>
+        <button class="btn-manual" onclick="addManual()">+</button>
+        <button class="btn-manual" onclick="removeManual()">−</button>
       </div>
       <span id="status-dot" class="dot connecting"></span>
       <span id="status-text">Conectando...</span>
@@ -91,14 +73,108 @@
     </div>
     <div id="map"></div>
     <div id="legend">
-      <span><span class="dot-legend blue"></span> Estudiantes</span>
-      <span><span class="dot-legend orange"></span> Disponible</span>
-      <span><span class="dot-legend red"></span> Lleno</span>
-      <span><span class="dot-legend yellow"></span> En camino</span>
+      <span><span class="dot-legend blue"></span>Estudiantes</span>
+      <span><span class="dot-legend orange"></span>Disponible</span>
+      <span><span class="dot-legend red"></span>Lleno</span>
+      <span><span class="dot-legend yellow"></span>En camino</span>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── Mapa de fondo animado ───────────────────────────────────────────────
+    var _bgMap = null, _bgTick = null;
+
+    (function () {
+      _bgMap = L.map('bg-map', {
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        tap: false,
+        touchZoom: false,
+      }).setView([11.5392, -72.9066], 14);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+      }).addTo(_bgMap);
+
+      function busIcon() {
+        return L.divIcon({ className: '', html: '<div class="bg-bus"></div>', iconSize: [20, 9], iconAnchor: [10, 4] });
+      }
+      function studentIcon() {
+        return L.divIcon({ className: '', html: '<div class="bg-student"></div>', iconSize: [9, 9], iconAnchor: [4, 4] });
+      }
+
+      // Rutas alrededor de UniGuajira y centro de Riohacha
+      var r1 = [
+        [11.5392, -72.9066], [11.5408, -72.9054], [11.5428, -72.9040],
+        [11.5448, -72.9025], [11.5465, -72.9008], [11.5452, -72.9022],
+        [11.5434, -72.9038], [11.5412, -72.9052], [11.5392, -72.9066],
+      ];
+      var r2 = [
+        [11.5285, -72.9168], [11.5308, -72.9144], [11.5332, -72.9118],
+        [11.5355, -72.9094], [11.5374, -72.9078], [11.5392, -72.9066],
+        [11.5374, -72.9078], [11.5352, -72.9096], [11.5328, -72.9120],
+        [11.5306, -72.9146], [11.5285, -72.9168],
+      ];
+
+      var stops = [
+        [11.5410, -72.9053], [11.5448, -72.9026], [11.5463, -72.9010],
+        [11.5310, -72.9142], [11.5354, -72.9095], [11.5374, -72.9078],
+      ];
+
+      var buses = [
+        { m: L.marker(r1[0], { icon: busIcon() }).addTo(_bgMap), route: r1, wp: 0 },
+        { m: L.marker(r2[5], { icon: busIcon() }).addTo(_bgMap), route: r2, wp: 5 },
+      ];
+
+      var students = [];
+      var SPEED = 0.000032;
+      var PICKUP = 0.0028;
+
+      function d(a, b) { var x=a[0]-b[0],y=a[1]-b[1]; return Math.sqrt(x*x+y*y); }
+
+      function spawn() {
+        if (students.length >= 5) return;
+        var s = stops[Math.floor(Math.random() * stops.length)];
+        students.push({ m: L.marker(s, { icon: studentIcon() }).addTo(_bgMap), pos: s });
+      }
+
+      stops.forEach(function (_, i) { setTimeout(spawn, i * 1000 + 500); });
+
+      _bgTick = setInterval(function () {
+        buses.forEach(function (bus) {
+          var p = bus.m.getLatLng();
+          var nwp = (bus.wp + 1) % bus.route.length;
+          var nx = bus.route[nwp];
+          var dx = nx[0] - p.lat, dy = nx[1] - p.lng;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < SPEED * 1.5) {
+            bus.wp = nwp;
+            bus.m.setLatLng(nx);
+          } else {
+            bus.m.setLatLng([p.lat + dx / dist * SPEED, p.lng + dy / dist * SPEED]);
+          }
+          var bp = [bus.m.getLatLng().lat, bus.m.getLatLng().lng];
+          for (var i = students.length - 1; i >= 0; i--) {
+            if (d(bp, students[i].pos) < PICKUP) {
+              students[i].m.remove();
+              students.splice(i, 1);
+              setTimeout(spawn, 1800 + Math.random() * 2200);
+            }
+          }
+        });
+      }, 50);
+    })();
+
+    window.__stopBgAnim = function () {
+      if (_bgTick) { clearInterval(_bgTick); _bgTick = null; }
+    };
+  </script>
   <script src="/static/app.js"></script>
 </body>
 </html>
