@@ -274,7 +274,7 @@ async function logout() {
 
 function initMap() {
   if (map) return;
-  map = L.map("map").setView(UNIGUAJIRA_COORDS, 15);
+  map = L.map("map", { zoomControl: false }).setView(UNIGUAJIRA_COORDS, 15);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap &copy; CARTO",
     maxZoom: 19,
