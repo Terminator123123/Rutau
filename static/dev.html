@@ -12,9 +12,31 @@
 </head>
 <body>
 
-  <!-- Auth screen -->
+  <!-- Mapa siempre visible — fondo antes del login y app real después -->
+  <div id="map-screen">
+    <div id="topbar" class="hidden">
+      <span id="role-badge"></span>
+      <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
+      <div id="passenger-counter" class="hidden">
+        <span id="counter-display">0/4</span>
+        <button class="btn-manual" onclick="addManual()">+</button>
+        <button class="btn-manual" onclick="removeManual()">−</button>
+      </div>
+      <span id="status-dot" class="dot connecting"></span>
+      <span id="status-text">Conectando...</span>
+      <button id="btn-logout" onclick="logout()">Salir</button>
+    </div>
+    <div id="map"></div>
+    <div id="legend" class="hidden">
+      <span><span class="dot-legend blue"></span>Estudiantes</span>
+      <span><span class="dot-legend orange"></span>Disponible</span>
+      <span><span class="dot-legend red"></span>Lleno</span>
+      <span><span class="dot-legend yellow"></span>En camino</span>
+    </div>
+  </div>
+
+  <!-- Auth card flota sobre el mapa — desaparece al iniciar sesión -->
   <div id="auth-screen">
-    <div id="bg-map"></div>
     <div class="auth-overlay"></div>
 
     <div class="auth-card">
@@ -57,229 +79,7 @@
     </div>
   </div>
 
-  <!-- Map screen -->
-  <div id="map-screen" class="hidden">
-    <div id="topbar">
-      <span id="role-badge"></span>
-      <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
-      <div id="passenger-counter" class="hidden">
-        <span id="counter-display">0/4</span>
-        <button class="btn-manual" onclick="addManual()">+</button>
-        <button class="btn-manual" onclick="removeManual()">−</button>
-      </div>
-      <span id="status-dot" class="dot connecting"></span>
-      <span id="status-text">Conectando...</span>
-      <button id="btn-logout" onclick="logout()">Salir</button>
-    </div>
-    <div id="map"></div>
-    <div id="legend">
-      <span><span class="dot-legend blue"></span>Estudiantes</span>
-      <span><span class="dot-legend orange"></span>Disponible</span>
-      <span><span class="dot-legend red"></span>Lleno</span>
-      <span><span class="dot-legend yellow"></span>En camino</span>
-    </div>
-  </div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // ── Simulación colectivos Riohacha ──────────────────────────────────────
-    var _bgMap = null, _bgTick = null;
-
-    (function () {
-      _bgMap = L.map('bg-map', {
-        zoomControl: false, attributionControl: false,
-        dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
-        boxZoom: false, keyboard: false, tap: false, touchZoom: false,
-      }).setView([11.5410, -72.9055], 15);
-
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(_bgMap);
-
-      // Forzar recálculo de tamaño una vez el DOM haya terminado de pintar
-      setTimeout(function () { _bgMap.invalidateSize(); }, 150);
-
-      function mkCol() {
-        return L.divIcon({ className: '', html: '<div class="bg-col"></div>', iconSize: [10, 10], iconAnchor: [5, 5] });
-      }
-      function mkPerson() {
-        return L.divIcon({ className: '', html: '<div class="bg-person"></div>', iconSize: [7, 7], iconAnchor: [3, 3] });
-      }
-
-      // ── Rutas siguiendo la cuadrícula de calles de Riohacha ───────────────
-      // Cada segmento es horizontal O vertical (no diagonal) para seguir calles
-
-      // Ruta fija U ↔ Rompoi por la vía principal (este-oeste)
-      var rtRompoi = [
-        [11.5392, -72.9066],  // Universidad
-        [11.5392, -72.9045],  // este por calle principal
-        [11.5392, -72.9020],
-        [11.5392, -72.8995],
-        [11.5392, -72.8965],
-        [11.5400, -72.8965],  // norte en carrera
-        [11.5400, -72.8935],  // este
-        [11.5400, -72.8905],
-        [11.5405, -72.8905],  // norte
-        [11.5405, -72.8875],  // Rompoi
-      ];
-
-      // Norte: U → barrio norte siguiendo calles
-      var rtNorte = [
-        [11.5392, -72.9066],  // U
-        [11.5392, -72.9050],  // este
-        [11.5410, -72.9050],  // norte
-        [11.5410, -72.9035],  // este
-        [11.5430, -72.9035],  // norte
-        [11.5430, -72.9020],  // este
-        [11.5450, -72.9020],  // norte
-        [11.5465, -72.9020],
-        [11.5465, -72.9035],  // oeste de vuelta
-        [11.5450, -72.9035],  // sur
-        [11.5450, -72.9050],  // oeste
-        [11.5430, -72.9050],  // sur
-        [11.5430, -72.9066],  // oeste
-        [11.5410, -72.9066],  // sur
-        [11.5392, -72.9066],  // U
-      ];
-
-      // Sur: U → barrio sur
-      var rtSur = [
-        [11.5392, -72.9066],  // U
-        [11.5392, -72.9080],  // oeste
-        [11.5375, -72.9080],  // sur
-        [11.5375, -72.9095],  // oeste
-        [11.5355, -72.9095],  // sur
-        [11.5355, -72.9112],  // oeste
-        [11.5335, -72.9112],  // sur
-        [11.5320, -72.9112],
-        [11.5320, -72.9095],  // este de vuelta
-        [11.5335, -72.9095],  // norte
-        [11.5335, -72.9080],  // este
-        [11.5355, -72.9080],  // norte
-        [11.5355, -72.9066],  // este
-        [11.5375, -72.9066],  // norte
-        [11.5392, -72.9066],  // U
-      ];
-
-      // Centro costero: U → centro histórico (norte)
-      var rtCentro = [
-        [11.5392, -72.9066],
-        [11.5410, -72.9066],  // norte
-        [11.5430, -72.9066],
-        [11.5430, -72.9080],  // oeste
-        [11.5448, -72.9080],  // norte
-        [11.5460, -72.9080],
-        [11.5460, -72.9066],  // este
-        [11.5460, -72.9050],
-        [11.5448, -72.9050],  // sur
-        [11.5430, -72.9050],
-        [11.5430, -72.9066],  // este
-        [11.5410, -72.9066],  // sur
-        [11.5392, -72.9066],
-      ];
-
-      // ── Crear colectivos ───────────────────────────────────────────────────
-      var vehicles = [];
-
-      function mkVehicle(route, wpOffset, dir) {
-        dir = dir || 1;
-        var wp = Math.min(wpOffset, route.length - 1);
-        return {
-          m: L.marker(route[wp], { icon: mkCol() }).addTo(_bgMap),
-          route: route,
-          wp: wp,
-          dir: dir,
-          pauseUntil: 0,
-        };
-      }
-
-      // 5 en ruta Rompoi escalonados
-      for (var i = 0; i < 5; i++) {
-        var wp0 = Math.round(i * (rtRompoi.length - 1) / 4);
-        vehicles.push(mkVehicle(rtRompoi, wp0, i % 2 === 0 ? 1 : -1));
-      }
-      // 4 en ruta norte
-      [0, 4, 8, 12].forEach(function(wp) { vehicles.push(mkVehicle(rtNorte, wp)); });
-      // 4 en ruta sur
-      [0, 4, 8, 12].forEach(function(wp) { vehicles.push(mkVehicle(rtSur, wp)); });
-      // 4 en ruta centro
-      [0, 3, 6, 9].forEach(function(wp) { vehicles.push(mkVehicle(rtCentro, wp)); });
-
-      // ── Paradas de personas ────────────────────────────────────────────────
-      var stops = [
-        // Filas en la U
-        [11.5394, -72.9070], [11.5394, -72.9067], [11.5394, -72.9063], [11.5394, -72.9059],
-        [11.5390, -72.9070], [11.5390, -72.9067], [11.5390, -72.9063], [11.5390, -72.9059],
-        // Fila en Rompoi
-        [11.5407, -72.8876], [11.5407, -72.8872], [11.5407, -72.8868],
-        [11.5407, -72.8864], [11.5407, -72.8860],
-        // Paradas intermedias ruta Rompoi
-        [11.5392, -72.9045], [11.5392, -72.8995], [11.5400, -72.8935],
-        // Paradas ciudad
-        [11.5430, -72.9035], [11.5450, -72.9020], [11.5465, -72.9028],
-        [11.5355, -72.9095], [11.5335, -72.9112], [11.5448, -72.9080],
-        [11.5460, -72.9066], [11.5410, -72.9050],
-      ];
-
-      var people = [];
-
-      function spawn() {
-        if (people.length >= 18) return;
-        var s = stops[Math.floor(Math.random() * stops.length)];
-        people.push({ m: L.marker(s, { icon: mkPerson() }).addTo(_bgMap), pos: s });
-      }
-
-      stops.forEach(function (_, i) { setTimeout(spawn, i * 220 + 100); });
-
-      function dist(a, b) { var x=a[0]-b[0],y=a[1]-b[1]; return Math.sqrt(x*x+y*y); }
-
-      // ~40 km/h realistas (era 0.000038 = ~300 km/h)
-      var SPEED  = 0.000005;
-      var PICKUP = 0.0015;
-
-      // ── Tick principal ─────────────────────────────────────────────────────
-      _bgTick = setInterval(function () {
-        var now = Date.now();
-
-        vehicles.forEach(function (v) {
-          if (now < v.pauseUntil) return;  // pausa en extremo de ruta
-
-          var p   = v.m.getLatLng();
-          var nwp = v.wp + v.dir;
-
-          // Llegó al extremo → pausa y reversa
-          if (nwp < 0 || nwp >= v.route.length) {
-            v.dir *= -1;
-            v.pauseUntil = now + 1200 + Math.random() * 800;
-            return;
-          }
-
-          var nx   = v.route[nwp];
-          var dx   = nx[0] - p.lat, dy = nx[1] - p.lng;
-          var d    = Math.sqrt(dx * dx + dy * dy);
-
-          if (d < SPEED * 1.5) {
-            v.wp = nwp;
-            v.m.setLatLng(nx);
-          } else {
-            v.m.setLatLng([p.lat + dx / d * SPEED, p.lng + dy / d * SPEED]);
-          }
-
-          // Recoger personas cercanas
-          var vp = [v.m.getLatLng().lat, v.m.getLatLng().lng];
-          for (var i = people.length - 1; i >= 0; i--) {
-            if (dist(vp, people[i].pos) < PICKUP) {
-              people[i].m.remove();
-              people.splice(i, 1);
-              setTimeout(spawn, 1000 + Math.random() * 1800);
-            }
-          }
-        });
-      }, 50);
-    })();
-
-    window.__stopBgAnim = function () {
-      if (_bgTick) { clearInterval(_bgTick); _bgTick = null; }
-    };
-  </script>
   <script src="/static/app.js"></script>
 </body>
 </html>

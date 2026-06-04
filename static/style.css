@@ -18,33 +18,37 @@ html, body {
   background: #f1f5f9;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
-/* ── Auth screen ─────────────────────────────────────────────────────────── */
+/* ── Map screen — always visible base layer ──────────────────────────────── */
+#map-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+#map { width: 100%; height: 100%; }
+
+/* ── Auth screen — overlay on top of map ─────────────────────────────────── */
 #auth-screen {
   position: fixed;
   inset: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Mapa de fondo — tiles claros, visible */
-#bg-map {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  filter: blur(2px) brightness(0.9) saturate(0.75);
-}
-
-/* Velo blanco muy suave sobre el mapa */
+/* Velo sobre el mapa */
 .auth-overlay {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(241, 245, 249, 0.45);
+  background: rgba(241, 245, 249, 0.35);
+  backdrop-filter: blur(2px) brightness(0.92);
+  -webkit-backdrop-filter: blur(2px) brightness(0.92);
+  transition: opacity 0.55s ease, backdrop-filter 0.55s ease;
 }
 
 /* Card de login */
@@ -61,6 +65,7 @@ html, body {
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.14), 0 4px 16px rgba(0, 0, 0, 0.06);
   animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
 }
 
 @keyframes fadeUp {
@@ -257,30 +262,6 @@ html, body {
 .form-msg.error   { background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2); color: var(--error); }
 .form-msg.success { background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.2); color: var(--success); }
 
-/* ── Marcadores del mapa de fondo ────────────────────────────────────────── */
-.bg-col {
-  width: 10px;
-  height: 10px;
-  background: #1d4ed8;
-  transform: rotate(45deg);
-  border-radius: 2px;
-  opacity: 0.75;
-}
-
-.bg-person {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #0891b2;
-  opacity: 0.85;
-  animation: pPulse 1.6s ease-in-out infinite;
-}
-
-@keyframes pPulse {
-  0%, 100% { transform: scale(1);   opacity: 0.85; }
-  50%       { transform: scale(1.7); opacity: 0.3; }
-}
-
 /* ── Spinner ─────────────────────────────────────────────────────────────── */
 .spinner {
   display: inline-block;
@@ -294,10 +275,6 @@ html, body {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Map screen (app real) ───────────────────────────────────────────────── */
-#map-screen { position: relative; width: 100vw; height: 100vh; }
-#map { width: 100%; height: 100%; }
 
 /* ── Topbar ──────────────────────────────────────────────────────────────── */
 #topbar {

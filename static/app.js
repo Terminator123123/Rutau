@@ -13,24 +13,29 @@ let currentUser = null;
 const markers = {};
 const clusterMarkers = {};
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// Marcadores de usuarios visibles antes del login (fondo)
+let _bgMarkers = {};
+let _bgPollTimer = null;
+
+// ── Cookie de sesión ───────────────────────────────────────────────────────
 
 function readSessionCookie() {
   const match = document.cookie.split("; ").find(r => r.startsWith("cu_info="));
   if (!match) return null;
-  try {
-    return JSON.parse(decodeURIComponent(match.split("=")[1]));
-  } catch (_) {
-    return null;
-  }
+  try { return JSON.parse(decodeURIComponent(match.split("=")[1])); } catch (_) { return null; }
 }
 
+// ── Init ───────────────────────────────────────────────────────────────────
+
 window.addEventListener("DOMContentLoaded", () => {
+  // Inicializar el mapa inmediatamente (se ve de fondo mientras no hay sesión)
+  initMap();
+  // Mostrar usuarios reales conectados en el fondo
+  startBgPoll();
+
   const params = new URLSearchParams(location.search);
-  if (params.get("verified") === "1") {
-    showVerifiedBanner();
-  }
-  // Lee el rol y nombre del usuario directo desde la cookie del navegador — sin llamar al servidor
+  if (params.get("verified") === "1") showVerifiedBanner();
+
   const saved = readSessionCookie();
   if (saved) {
     currentUser = saved;
@@ -46,7 +51,42 @@ function showVerifiedBanner() {
   }
 }
 
-// ── Auth tabs ─────────────────────────────────────────────────────────────────
+// ── Polling de usuarios en el fondo (antes del login) ─────────────────────
+
+function startBgPoll() {
+  pollBgUsers();
+  _bgPollTimer = setInterval(pollBgUsers, 6000);
+}
+
+function stopBgPoll() {
+  clearInterval(_bgPollTimer);
+  _bgPollTimer = null;
+  Object.values(_bgMarkers).forEach(m => m.remove());
+  _bgMarkers = {};
+}
+
+function pollBgUsers() {
+  fetch("/usuarios/activos")
+    .then(r => r.json())
+    .then(data => {
+      const activeIds = new Set((data.usuarios || []).map(u => u.id));
+      Object.keys(_bgMarkers).forEach(id => {
+        if (!activeIds.has(id)) { _bgMarkers[id].remove(); delete _bgMarkers[id]; }
+      });
+      (data.usuarios || []).forEach(u => {
+        if (!u.lat || !u.lng) return;
+        const icon = buildIcon(u, false);
+        if (_bgMarkers[u.id]) {
+          _bgMarkers[u.id].setLatLng([u.lat, u.lng]).setIcon(icon);
+        } else {
+          _bgMarkers[u.id] = L.marker([u.lat, u.lng], { icon }).addTo(map);
+        }
+      });
+    })
+    .catch(() => {});
+}
+
+// ── Auth tabs ──────────────────────────────────────────────────────────────
 
 function showTab(tab) {
   const isLogin = tab === "login";
@@ -91,7 +131,7 @@ function showForgot() {
   });
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────────
+// ── Login ──────────────────────────────────────────────────────────────────
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -121,7 +161,7 @@ async function handleLogin(e) {
   }
 }
 
-// ── Register ──────────────────────────────────────────────────────────────────
+// ── Register ───────────────────────────────────────────────────────────────
 
 async function handleRegister(e) {
   e.preventDefault();
@@ -143,9 +183,8 @@ async function handleRegister(e) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Error al registrarse");
-
     msgEl.className = "form-msg success";
-    msgEl.textContent = "¡Cuenta creada! Revisa tu correo y haz clic en el enlace de verificación para ingresar.";
+    msgEl.textContent = "¡Cuenta creada! Revisa tu correo y haz clic en el enlace de verificación.";
     e.target.reset();
     selectRole("estudiante");
     setLoading(btn, false);
@@ -156,29 +195,15 @@ async function handleRegister(e) {
   }
 }
 
-async function logout() {
-  try {
-    await fetch("/logout", { method: "POST", credentials: "include" });
-  } catch (_) {}
-  currentUser = null;
-  cleanup();
-  document.getElementById("map-screen").classList.add("hidden");
-  document.getElementById("auth-screen").classList.remove("hidden");
-}
-
-// ── Map start ─────────────────────────────────────────────────────────────────
+// ── Transición de login → mapa ─────────────────────────────────────────────
 
 function startMap() {
-  if (window.__stopBgAnim) window.__stopBgAnim();
+  stopBgPoll();
   myStatus = currentUser.role === "conductor" ? "disponible" : null;
   manualPassengers = 0;
 
-  document.getElementById("auth-screen").classList.add("hidden");
-  document.getElementById("map-screen").classList.remove("hidden");
-
   const badge = document.getElementById("role-badge");
-  const label = currentUser.role === "estudiante" ? "Estudiante" : "Conductor";
-  badge.textContent = currentUser.name + " · " + label;
+  badge.textContent = currentUser.name + " · " + (currentUser.role === "estudiante" ? "Estudiante" : "Conductor");
 
   if (currentUser.role === "conductor") {
     document.getElementById("btn-status").classList.remove("hidden");
@@ -187,61 +212,76 @@ function startMap() {
     updateCounterDisplay(0);
   }
 
-  initMap();
-  requestLocation();
+  // Animación: el card se acerca y desaparece, el mapa queda nítido
+  const authScreen = document.getElementById("auth-screen");
+  const card       = authScreen.querySelector(".auth-card");
+  const overlay    = authScreen.querySelector(".auth-overlay");
+
+  card.style.transform   = "scale(1.12) translateY(-12px)";
+  card.style.opacity     = "0";
+  overlay.style.opacity  = "0";
+  overlay.style.backdropFilter = "blur(0px)";
+
+  setTimeout(() => {
+    authScreen.classList.add("hidden");
+    document.getElementById("topbar").classList.remove("hidden");
+    document.getElementById("legend").classList.remove("hidden");
+    map.invalidateSize();
+    requestLocation();
+  }, 580);
 }
 
-// ── Status ────────────────────────────────────────────────────────────────────
+// ── Logout → vuelve el card ────────────────────────────────────────────────
 
-function cycleStatus() {
-  const idx = STATUS_CYCLE.indexOf(myStatus);
-  myStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
-  updateStatusButton();
-  if (lastLat !== null) sendLocation(lastLat, lastLng);
+async function logout() {
+  try { await fetch("/logout", { method: "POST", credentials: "include" }); } catch (_) {}
+  currentUser = null;
+  cleanup();
+
+  document.getElementById("topbar").classList.add("hidden");
+  document.getElementById("legend").classList.add("hidden");
+  document.getElementById("btn-status").classList.add("hidden");
+  document.getElementById("passenger-counter").classList.add("hidden");
+
+  // Preparar auth screen en estado invisible y mostrarlo
+  const authScreen = document.getElementById("auth-screen");
+  const card       = authScreen.querySelector(".auth-card");
+  const overlay    = authScreen.querySelector(".auth-overlay");
+
+  card.style.transition    = "none";
+  overlay.style.transition = "none";
+  card.style.transform     = "scale(1.12) translateY(-12px)";
+  card.style.opacity       = "0";
+  overlay.style.opacity    = "0";
+  overlay.style.backdropFilter = "blur(0px)";
+
+  authScreen.classList.remove("hidden");
+
+  // Animar de vuelta: el card baja y aparece
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    card.style.transition    = "transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease";
+    overlay.style.transition = "opacity 0.55s ease, backdrop-filter 0.55s ease";
+    card.style.transform     = "scale(1) translateY(0)";
+    card.style.opacity       = "1";
+    overlay.style.opacity    = "1";
+    overlay.style.backdropFilter = "blur(2px) brightness(0.92)";
+  }));
+
+  startBgPoll();
 }
 
-function updateStatusButton() {
-  const btn = document.getElementById("btn-status");
-  btn.textContent = STATUS_LABELS[myStatus];
-  btn.className = "";
-  btn.id = "btn-status";
-  btn.classList.add(myStatus === "en camino" ? "en-camino" : myStatus);
-}
-
-// ── Passenger counter ─────────────────────────────────────────────────────────
-
-function addManual() {
-  if (manualPassengers < MAX_PASSENGERS) {
-    manualPassengers++;
-    if (lastLat !== null) sendLocation(lastLat, lastLng);
-  }
-}
-
-function removeManual() {
-  if (manualPassengers > 0) {
-    manualPassengers--;
-    if (lastLat !== null) sendLocation(lastLat, lastLng);
-  }
-}
-
-function updateCounterDisplay(total) {
-  const el = document.getElementById("counter-display");
-  el.textContent = total + "/" + MAX_PASSENGERS;
-  el.className = total >= MAX_PASSENGERS ? "full" : "";
-}
-
-// ── Map ───────────────────────────────────────────────────────────────────────
+// ── Mapa ───────────────────────────────────────────────────────────────────
 
 function initMap() {
-  if (map) { map.remove(); map = null; }
+  if (map) return;
   map = L.map("map").setView(UNIGUAJIRA_COORDS, 15);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap &copy; CARTO",
     maxZoom: 19,
   }).addTo(map);
 }
 
-// ── Geolocation ───────────────────────────────────────────────────────────────
+// ── Geolocation ────────────────────────────────────────────────────────────
 
 function requestLocation() {
   if (!navigator.geolocation) { setStatus("error", "GPS no disponible"); return; }
@@ -259,21 +299,20 @@ function requestLocation() {
 function startWatching() {
   watchId = navigator.geolocation.watchPosition(
     (pos) => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState === WebSocket.OPEN)
         sendLocation(pos.coords.latitude, pos.coords.longitude);
-      }
     },
     () => {},
     { enableHighAccuracy: true, maximumAge: 2000 }
   );
 }
 
-// ── WebSocket ─────────────────────────────────────────────────────────────────
+// ── WebSocket ──────────────────────────────────────────────────────────────
 
 function connectWS(lat, lng) {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen  = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
+  ws.onopen    = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
   ws.onclose   = (e) => {
     if (e.code === 4001 || e.code === 4003) { logout(); return; }
@@ -283,34 +322,58 @@ function connectWS(lat, lng) {
 }
 
 function sendLocation(lat, lng) {
-  lastLat = lat;
-  lastLng = lng;
+  lastLat = lat; lastLng = lng;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
-      lat,
-      lng,
+      lat, lng,
       status: myStatus,
       manual_passengers: currentUser.role === "conductor" ? manualPassengers : 0,
     }));
   }
 }
 
-// ── Messages ──────────────────────────────────────────────────────────────────
+// ── Status & counter ───────────────────────────────────────────────────────
+
+function cycleStatus() {
+  const idx = STATUS_CYCLE.indexOf(myStatus);
+  myStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+  updateStatusButton();
+  if (lastLat !== null) sendLocation(lastLat, lastLng);
+}
+
+function updateStatusButton() {
+  const btn = document.getElementById("btn-status");
+  btn.textContent = STATUS_LABELS[myStatus];
+  btn.className = "";
+  btn.id = "btn-status";
+  btn.classList.add(myStatus === "en camino" ? "en-camino" : myStatus);
+}
+
+function addManual() {
+  if (manualPassengers < MAX_PASSENGERS) { manualPassengers++; if (lastLat !== null) sendLocation(lastLat, lastLng); }
+}
+
+function removeManual() {
+  if (manualPassengers > 0) { manualPassengers--; if (lastLat !== null) sendLocation(lastLat, lastLng); }
+}
+
+function updateCounterDisplay(total) {
+  const el = document.getElementById("counter-display");
+  el.textContent = total + "/" + MAX_PASSENGERS;
+  el.className = total >= MAX_PASSENGERS ? "full" : "";
+}
+
+// ── Messages ───────────────────────────────────────────────────────────────
 
 function handleMessage(msg) {
   if (msg.type === "snapshot") {
     msg.users.forEach(addOrUpdateMarker);
   } else if (msg.type === "update") {
-    if (!myId && msg.user.name === currentUser.name && msg.user.role === currentUser.role) {
+    if (!myId && msg.user.name === currentUser.name && msg.user.role === currentUser.role)
       myId = msg.user.id;
-    }
     addOrUpdateMarker(msg.user);
-
     if (msg.user.id === myId && currentUser.role === "conductor") {
-      if (msg.user.status !== myStatus) {
-        myStatus = msg.user.status;
-        updateStatusButton();
-      }
+      if (msg.user.status !== myStatus) { myStatus = msg.user.status; updateStatusButton(); }
       updateCounterDisplay(msg.user.onboard_count);
     }
   } else if (msg.type === "remove") {
@@ -318,12 +381,12 @@ function handleMessage(msg) {
   }
 }
 
-// ── Markers ───────────────────────────────────────────────────────────────────
+// ── Markers ────────────────────────────────────────────────────────────────
 
 function markerColor(user) {
-  if (user.role === "estudiante")     return "#0ea5e9";
-  if (user.status === "lleno")        return "#ef4444";
-  if (user.status === "en camino")    return "#eab308";
+  if (user.role === "estudiante")  return "#0ea5e9";
+  if (user.status === "lleno")     return "#ef4444";
+  if (user.status === "en camino") return "#eab308";
   return "#f97316";
 }
 
@@ -385,7 +448,7 @@ function removeMarker(id) {
   refreshClusters();
 }
 
-// ── Clustering ────────────────────────────────────────────────────────────────
+// ── Clustering ─────────────────────────────────────────────────────────────
 
 function haversineJS(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -397,65 +460,46 @@ function haversineJS(lat1, lng1, lat2, lng2) {
 
 function refreshClusters() {
   if (!map) return;
-  const students = Object.values(markers)
-    .map((m) => m._userData)
-    .filter((u) => u && u.role === "estudiante");
-
-  const visited = new Set();
-  const groups  = [];
+  const students = Object.values(markers).map(m => m._userData).filter(u => u && u.role === "estudiante");
+  const visited = new Set(), groups = [];
   for (const u of students) {
     if (visited.has(u.id)) continue;
-    const group = [u];
-    visited.add(u.id);
+    const group = [u]; visited.add(u.id);
     for (const v of students) {
       if (visited.has(v.id)) continue;
-      if (haversineJS(u.lat, u.lng, v.lat, v.lng) <= CLUSTER_RADIUS_M) {
-        group.push(v); visited.add(v.id);
-      }
+      if (haversineJS(u.lat, u.lng, v.lat, v.lng) <= CLUSTER_RADIUS_M) { group.push(v); visited.add(v.id); }
     }
     groups.push(group);
   }
-
-  Object.values(clusterMarkers).forEach((m) => m.remove());
-  Object.keys(clusterMarkers).forEach((k) => delete clusterMarkers[k]);
-
+  Object.values(clusterMarkers).forEach(m => m.remove());
+  Object.keys(clusterMarkers).forEach(k => delete clusterMarkers[k]);
   const inCluster = new Set();
   for (const group of groups) {
     if (group.length < 2) continue;
-    group.forEach((u) => { inCluster.add(u.id); if (markers[u.id]) markers[u.id].setOpacity(0); });
-
+    group.forEach(u => { inCluster.add(u.id); if (markers[u.id]) markers[u.id].setOpacity(0); });
     const cLat = group.reduce((s, u) => s + u.lat, 0) / group.length;
     const cLng = group.reduce((s, u) => s + u.lng, 0) / group.length;
     const count = group.length;
-    const key   = group.map((u) => u.id).sort().join("-");
-    const sz    = Math.min(14 + count * 8, 48);
-
+    const key = group.map(u => u.id).sort().join("-");
+    const sz = Math.min(14 + count * 8, 48);
     const icon = L.divIcon({
       className: "",
       html: `<div style="background:#0ea5e9;width:${sz}px;height:${sz}px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800;color:#fff">${count}</div>`,
       iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2],
     });
-    const names = group.map((u) => u.name).join(", ");
-    clusterMarkers[key] = L.marker([cLat, cLng], { icon })
-      .addTo(map)
+    const names = group.map(u => u.name).join(", ");
+    clusterMarkers[key] = L.marker([cLat, cLng], { icon }).addTo(map)
       .bindPopup(`<div class="popup-name">${count} estudiantes</div><div class="popup-info">${names}</div>`);
   }
-
-  students.forEach((u) => {
-    if (!inCluster.has(u.id) && markers[u.id]) markers[u.id].setOpacity(1);
-  });
+  students.forEach(u => { if (!inCluster.has(u.id) && markers[u.id]) markers[u.id].setOpacity(1); });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 function setLoading(btn, loading) {
   btn.disabled = loading;
-  if (loading) {
-    btn._orig = btn.textContent;
-    btn.innerHTML = '<span class="spinner"></span>';
-  } else {
-    btn.textContent = btn._orig || btn.textContent;
-  }
+  if (loading) { btn._orig = btn.textContent; btn.innerHTML = '<span class="spinner"></span>'; }
+  else { btn.textContent = btn._orig || btn.textContent; }
 }
 
 function setStatus(state, text) {
@@ -466,12 +510,9 @@ function setStatus(state, text) {
 function cleanup() {
   if (watchId) navigator.geolocation.clearWatch(watchId);
   if (ws) ws.close();
-  Object.values(markers).forEach((m) => m.remove());
-  Object.keys(markers).forEach((k) => delete markers[k]);
-  Object.values(clusterMarkers).forEach((m) => m.remove());
-  Object.keys(clusterMarkers).forEach((k) => delete clusterMarkers[k]);
-  myId = null; lastLat = null; lastLng = null;
-  manualPassengers = 0;
-  document.getElementById("btn-status").classList.add("hidden");
-  document.getElementById("passenger-counter").classList.add("hidden");
+  Object.values(markers).forEach(m => m.remove());
+  Object.keys(markers).forEach(k => delete markers[k]);
+  Object.values(clusterMarkers).forEach(m => m.remove());
+  Object.keys(clusterMarkers).forEach(k => delete clusterMarkers[k]);
+  myId = null; lastLat = null; lastLng = null; manualPassengers = 0;
 }
