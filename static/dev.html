@@ -82,113 +82,190 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // ── Mapa de fondo animado ───────────────────────────────────────────────
+    // ── Simulación colectivos Riohacha ──────────────────────────────────────
     var _bgMap = null, _bgTick = null;
 
     (function () {
       _bgMap = L.map('bg-map', {
-        zoomControl: false,
-        attributionControl: false,
-        dragging: false,
-        scrollWheelZoom: false,
-        doubleClickZoom: false,
-        boxZoom: false,
-        keyboard: false,
-        tap: false,
-        touchZoom: false,
-      }).setView([11.5392, -72.9066], 14);
+        zoomControl: false, attributionControl: false,
+        dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
+        boxZoom: false, keyboard: false, tap: false, touchZoom: false,
+      }).setView([11.5396, -72.8980], 13);
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-      }).addTo(_bgMap);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(_bgMap);
 
-      function busIcon() {
-        return L.divIcon({ className: '', html: '<div class="bg-bus"></div>', iconSize: [20, 9], iconAnchor: [10, 4] });
+      function mkCol() {
+        return L.divIcon({ className: '', html: '<div class="bg-col"></div>', iconSize: [10, 10], iconAnchor: [5, 5] });
       }
-      function studentIcon() {
-        return L.divIcon({ className: '', html: '<div class="bg-student"></div>', iconSize: [9, 9], iconAnchor: [4, 4] });
+      function mkPerson() {
+        return L.divIcon({ className: '', html: '<div class="bg-person"></div>', iconSize: [7, 7], iconAnchor: [3, 3] });
       }
 
-      // Rutas alrededor de UniGuajira y centro de Riohacha
-      var r1 = [
-        [11.5392, -72.9066], [11.5408, -72.9054], [11.5428, -72.9040],
-        [11.5448, -72.9025], [11.5465, -72.9008], [11.5452, -72.9022],
-        [11.5434, -72.9038], [11.5412, -72.9052], [11.5392, -72.9066],
-      ];
-      var r2 = [
-        [11.5285, -72.9168], [11.5308, -72.9144], [11.5332, -72.9118],
-        [11.5355, -72.9094], [11.5374, -72.9078], [11.5392, -72.9066],
-        [11.5374, -72.9078], [11.5352, -72.9096], [11.5328, -72.9120],
-        [11.5306, -72.9146], [11.5285, -72.9168],
-      ];
-      var r3 = [
-        [11.5460, -72.9100], [11.5448, -72.9082], [11.5432, -72.9070],
-        [11.5415, -72.9068], [11.5400, -72.9067], [11.5392, -72.9066],
-        [11.5400, -72.9067], [11.5418, -72.9068], [11.5435, -72.9072],
-        [11.5450, -72.9085], [11.5460, -72.9100],
-      ];
-      var r4 = [
-        [11.5392, -72.9066], [11.5380, -72.9050], [11.5365, -72.9035],
-        [11.5350, -72.9020], [11.5338, -72.9010], [11.5350, -72.9020],
-        [11.5365, -72.9035], [11.5380, -72.9050], [11.5392, -72.9066],
-      ];
-      var r5 = [
-        [11.5250, -72.9220], [11.5275, -72.9195], [11.5300, -72.9170],
-        [11.5325, -72.9145], [11.5350, -72.9115], [11.5368, -72.9090],
-        [11.5385, -72.9074], [11.5392, -72.9066],
-        [11.5385, -72.9074], [11.5365, -72.9092], [11.5342, -72.9118],
-        [11.5318, -72.9142], [11.5292, -72.9168], [11.5265, -72.9200],
-        [11.5250, -72.9220],
+      // ── Coordenadas clave ──────────────────────────────────────────────────
+      // UniGuajira: [11.5392, -72.9066]
+      // Rompoi (barrio al este): [11.5405, -72.8870]
+      // Ruta principal U → Rompoi va por la vía principal hacia el este
+
+      var UNI    = [11.5392, -72.9066];
+      var ROMPOI = [11.5405, -72.8870];
+
+      // Ruta fija U ↔ Rompoi
+      var rtRompoi = [
+        [11.5392, -72.9066],
+        [11.5393, -72.9010],
+        [11.5395, -72.8960],
+        [11.5398, -72.8920],
+        [11.5401, -72.8890],
+        [11.5405, -72.8870],
       ];
 
+      // Rutas por el resto de Riohacha
+      var rtNorte = [
+        [11.5392, -72.9066],
+        [11.5412, -72.9055],
+        [11.5435, -72.9042],
+        [11.5455, -72.9028],
+        [11.5470, -72.9012],
+        [11.5455, -72.9028],
+        [11.5432, -72.9043],
+        [11.5410, -72.9056],
+        [11.5392, -72.9066],
+      ];
+      var rtSur = [
+        [11.5392, -72.9066],
+        [11.5372, -72.9078],
+        [11.5350, -72.9095],
+        [11.5325, -72.9118],
+        [11.5300, -72.9140],
+        [11.5278, -72.9162],
+        [11.5300, -72.9140],
+        [11.5326, -72.9117],
+        [11.5350, -72.9095],
+        [11.5373, -72.9077],
+        [11.5392, -72.9066],
+      ];
+      var rtCentro = [
+        [11.5392, -72.9066],
+        [11.5410, -72.9068],
+        [11.5430, -72.9070],
+        [11.5448, -72.9072],
+        [11.5462, -72.9068],
+        [11.5448, -72.9072],
+        [11.5430, -72.9070],
+        [11.5410, -72.9068],
+        [11.5392, -72.9066],
+      ];
+      var rtOeste = [
+        [11.5392, -72.9066],
+        [11.5380, -72.9050],
+        [11.5365, -72.9038],
+        [11.5350, -72.9025],
+        [11.5338, -72.9015],
+        [11.5350, -72.9025],
+        [11.5365, -72.9038],
+        [11.5380, -72.9050],
+        [11.5392, -72.9066],
+      ];
+
+      // ── Crear colectivos ───────────────────────────────────────────────────
+      // 5 en ruta Rompoi, escalonados; resto en rutas de ciudad
+      var vehicles = [];
+
+      function mkVehicle(route, wpOffset, dir) {
+        dir = dir || 1;
+        var wp = wpOffset % route.length;
+        return {
+          m: L.marker(route[wp], { icon: mkCol() }).addTo(_bgMap),
+          route: route,
+          wp: wp,
+          dir: dir,
+          pauseUntil: 0,
+        };
+      }
+
+      // Ruta Rompoi (5 colectivos escalonados — van y vienen)
+      for (var i = 0; i < 5; i++) {
+        var wp = Math.round(i * (rtRompoi.length - 1) / 4);
+        vehicles.push(mkVehicle(rtRompoi, wp, i % 2 === 0 ? 1 : -1));
+      }
+
+      // Rutas ciudad (8 colectivos en 4 rutas)
+      [[rtNorte, 0], [rtNorte, 4], [rtSur, 0], [rtSur, 5],
+       [rtCentro, 0], [rtCentro, 4], [rtOeste, 0], [rtOeste, 4]
+      ].forEach(function(cfg) {
+        vehicles.push(mkVehicle(cfg[0], cfg[1]));
+      });
+
+      // ── Puntos de espera (personas) ────────────────────────────────────────
+      // Denses cerca a la U y al Rompoi; distribuidos por la ciudad
       var stops = [
-        [11.5410, -72.9053], [11.5448, -72.9026], [11.5463, -72.9010],
-        [11.5310, -72.9142], [11.5354, -72.9095], [11.5374, -72.9078],
-        [11.5450, -72.9088], [11.5435, -72.9070], [11.5365, -72.9037],
-        [11.5275, -72.9195], [11.5325, -72.9145], [11.5340, -72.9112],
+        // Filas en la U (2 filas, 4 por fila)
+        [11.5394, -72.9070], [11.5394, -72.9067], [11.5394, -72.9064], [11.5394, -72.9061],
+        [11.5390, -72.9070], [11.5390, -72.9067], [11.5390, -72.9064], [11.5390, -72.9061],
+        // Fila en Rompoi (5 puestos)
+        [11.5407, -72.8874], [11.5407, -72.8870], [11.5407, -72.8866],
+        [11.5407, -72.8862], [11.5407, -72.8858],
+        // A lo largo de la ruta U-Rompoi
+        [11.5393, -72.9010], [11.5396, -72.8958], [11.5399, -72.8920],
+        // Rutas ciudad
+        [11.5435, -72.9042], [11.5458, -72.9028], [11.5350, -72.9095],
+        [11.5300, -72.9140], [11.5365, -72.9038], [11.5448, -72.9072],
+        [11.5280, -72.9162],
       ];
 
-      var buses = [
-        { m: L.marker(r1[0], { icon: busIcon() }).addTo(_bgMap), route: r1, wp: 0 },
-        { m: L.marker(r2[5], { icon: busIcon() }).addTo(_bgMap), route: r2, wp: 5 },
-        { m: L.marker(r3[3], { icon: busIcon() }).addTo(_bgMap), route: r3, wp: 3 },
-        { m: L.marker(r4[2], { icon: busIcon() }).addTo(_bgMap), route: r4, wp: 2 },
-        { m: L.marker(r5[7], { icon: busIcon() }).addTo(_bgMap), route: r5, wp: 7 },
-      ];
-
-      var students = [];
-      var SPEED = 0.000032;
-      var PICKUP = 0.0028;
-
-      function d(a, b) { var x=a[0]-b[0],y=a[1]-b[1]; return Math.sqrt(x*x+y*y); }
+      // ── Personas activas ───────────────────────────────────────────────────
+      var people = [];
 
       function spawn() {
-        if (students.length >= 9) return;
+        if (people.length >= 18) return;
         var s = stops[Math.floor(Math.random() * stops.length)];
-        students.push({ m: L.marker(s, { icon: studentIcon() }).addTo(_bgMap), pos: s });
+        people.push({ m: L.marker(s, { icon: mkPerson() }).addTo(_bgMap), pos: s });
       }
 
-      stops.forEach(function (_, i) { setTimeout(spawn, i * 400 + 200); });
+      // Arranque escalonado
+      stops.forEach(function (_, i) { setTimeout(spawn, i * 250 + 100); });
 
+      // ── Distancia ─────────────────────────────────────────────────────────
+      function dist(a, b) { var x=a[0]-b[0],y=a[1]-b[1]; return Math.sqrt(x*x+y*y); }
+
+      var SPEED  = 0.000038;
+      var PICKUP = 0.003;
+
+      // ── Tick principal ─────────────────────────────────────────────────────
       _bgTick = setInterval(function () {
-        buses.forEach(function (bus) {
-          var p = bus.m.getLatLng();
-          var nwp = (bus.wp + 1) % bus.route.length;
-          var nx = bus.route[nwp];
-          var dx = nx[0] - p.lat, dy = nx[1] - p.lng;
-          var dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < SPEED * 1.5) {
-            bus.wp = nwp;
-            bus.m.setLatLng(nx);
-          } else {
-            bus.m.setLatLng([p.lat + dx / dist * SPEED, p.lng + dy / dist * SPEED]);
+        var now = Date.now();
+
+        vehicles.forEach(function (v) {
+          if (now < v.pauseUntil) return;  // pausa en extremo de ruta
+
+          var p   = v.m.getLatLng();
+          var nwp = v.wp + v.dir;
+
+          // Llegó al extremo → pausa y reversa
+          if (nwp < 0 || nwp >= v.route.length) {
+            v.dir *= -1;
+            v.pauseUntil = now + 1200 + Math.random() * 800;
+            return;
           }
-          var bp = [bus.m.getLatLng().lat, bus.m.getLatLng().lng];
-          for (var i = students.length - 1; i >= 0; i--) {
-            if (d(bp, students[i].pos) < PICKUP) {
-              students[i].m.remove();
-              students.splice(i, 1);
-              setTimeout(spawn, 1800 + Math.random() * 2200);
+
+          var nx   = v.route[nwp];
+          var dx   = nx[0] - p.lat, dy = nx[1] - p.lng;
+          var d    = Math.sqrt(dx * dx + dy * dy);
+
+          if (d < SPEED * 1.5) {
+            v.wp = nwp;
+            v.m.setLatLng(nx);
+          } else {
+            v.m.setLatLng([p.lat + dx / d * SPEED, p.lng + dy / d * SPEED]);
+          }
+
+          // Recoger personas cercanas
+          var vp = [v.m.getLatLng().lat, v.m.getLatLng().lng];
+          for (var i = people.length - 1; i >= 0; i--) {
+            if (dist(vp, people[i].pos) < PICKUP) {
+              people[i].m.remove();
+              people.splice(i, 1);
+              setTimeout(spawn, 1000 + Math.random() * 1800);
             }
           }
         });
