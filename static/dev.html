@@ -94,6 +94,9 @@
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(_bgMap);
 
+      // Forzar recálculo de tamaño una vez el DOM haya terminado de pintar
+      setTimeout(function () { _bgMap.invalidateSize(); }, 150);
+
       function mkCol() {
         return L.divIcon({ className: '', html: '<div class="bg-col"></div>', iconSize: [10, 10], iconAnchor: [5, 5] });
       }
