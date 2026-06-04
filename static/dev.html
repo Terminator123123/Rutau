@@ -92,7 +92,7 @@
         boxZoom: false, keyboard: false, tap: false, touchZoom: false,
       }).setView([11.5396, -72.8980], 13);
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(_bgMap);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(_bgMap);
 
       // Forzar recálculo de tamaño una vez el DOM haya terminado de pintar
       setTimeout(function () { _bgMap.invalidateSize(); }, 150);
