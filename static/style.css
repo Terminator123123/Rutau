@@ -437,3 +437,384 @@ html, body {
 
 /* ── Utility ─────────────────────────────────────────────────────────────── */
 .hidden { display: none !important; }
+
+/* ── Zone select ──────────────────────────────────────────────────────────── */
+#zone-select {
+  padding: 0.28rem 0.6rem;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-family: var(--font);
+  font-size: 0.75rem;
+  cursor: pointer;
+  max-width: 160px;
+}
+
+#zone-select option { background: #0f172a; color: #f1f5f9; }
+
+/* ── Student action buttons ───────────────────────────────────────────────── */
+#student-actions {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 240px;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 0.85rem;
+  border: none;
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.18s, transform 0.18s;
+  letter-spacing: 0.01em;
+}
+
+.action-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+}
+
+.action-btn.secondary {
+  background: rgba(7,11,18,0.85);
+  color: #94a3b8;
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+}
+
+.action-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.action-btn:active { transform: translateY(0); }
+
+/* ── Waiting overlay ──────────────────────────────────────────────────────── */
+#waiting-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2rem;
+  pointer-events: none;
+}
+
+.waiting-card {
+  background: rgba(7,11,18,0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  pointer-events: all;
+  animation: fadeUp 0.3s ease both;
+}
+
+.waiting-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+.waiting-title { font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.3rem; }
+.waiting-sub   { font-size: 0.8rem; color: #64748b; margin-bottom: 1rem; }
+
+.btn-cancel-ride {
+  padding: 0.5rem 1.5rem;
+  background: rgba(220,38,38,0.12);
+  border: 1px solid rgba(220,38,38,0.3);
+  border-radius: 8px;
+  color: #f87171;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.btn-cancel-ride:hover { background: rgba(220,38,38,0.22); }
+
+/* ── Conductor approaching card ───────────────────────────────────────────── */
+#conductor-approaching {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: 240px;
+}
+
+.approaching-card {
+  background: rgba(7,11,18,0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(37,99,235,0.3);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  animation: fadeUp 0.3s ease both;
+}
+
+.approaching-title { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.3rem; }
+.approaching-name  { font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.2rem; }
+.approaching-zone  { font-size: 0.78rem; color: #94a3b8; }
+
+/* ── Passengers panel (conductor) ─────────────────────────────────────────── */
+#passengers-panel {
+  position: absolute;
+  top: 56px;
+  right: 0.75rem;
+  z-index: 1000;
+  width: 220px;
+  background: rgba(7,11,18,0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  font-family: var(--font);
+}
+
+.passengers-header {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.passenger-item {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.passenger-name { font-size: 0.8rem; font-weight: 500; color: #e2e8f0; }
+
+.passenger-btns { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+.btn-paction {
+  padding: 0.2rem 0.55rem;
+  border-radius: 5px;
+  border: 1px solid;
+  font-family: var(--font);
+  font-size: 0.65rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-paction.onboard {
+  background: rgba(37,99,235,0.1);
+  border-color: rgba(37,99,235,0.3);
+  color: #93c5fd;
+}
+
+.btn-paction.dropoff {
+  background: rgba(22,163,74,0.1);
+  border-color: rgba(22,163,74,0.3);
+  color: #4ade80;
+}
+
+.btn-paction.msg {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
+  color: #94a3b8;
+}
+
+.btn-paction:hover { opacity: 0.75; }
+
+/* ── Modal base ───────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 2rem 1.75rem;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  animation: fadeUp 0.3s ease both;
+}
+
+.modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1rem;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.modal-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+/* ── T&C ──────────────────────────────────────────────────────────────────── */
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+}
+
+.terms-label input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; }
+
+.btn-terms-link {
+  background: none; border: none;
+  color: var(--accent); font-size: inherit;
+  font-family: var(--font); cursor: pointer;
+  padding: 0; text-decoration: underline;
+}
+
+.terms-body {
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.terms-body p {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.55;
+}
+
+/* ── Rating modal ─────────────────────────────────────────────────────────── */
+.rating-conductor { font-size: 0.85rem; color: var(--muted); text-align: center; margin-bottom: 1rem; }
+
+.stars-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.star {
+  font-size: 2rem;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color 0.15s, transform 0.1s;
+  line-height: 1;
+}
+
+.star.active { color: #fbbf24; }
+.star:hover  { transform: scale(1.15); }
+
+/* ── Request modal (conductor) ────────────────────────────────────────────── */
+.request-student  { font-size: 1rem; font-weight: 600; color: var(--text); text-align: center; margin-bottom: 0.3rem; }
+.request-distance { font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 0.15rem; }
+.request-zone     { font-size: 0.8rem; color: var(--accent); text-align: center; margin-bottom: 1rem; font-weight: 500; }
+
+.request-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem; }
+
+.btn-accept {
+  padding: 0.7rem;
+  background: rgba(22,163,74,0.1);
+  border: 1px solid rgba(22,163,74,0.3);
+  border-radius: 8px;
+  color: #16a34a;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.btn-accept:hover { background: rgba(22,163,74,0.2); }
+
+.btn-reject {
+  padding: 0.7rem;
+  background: rgba(220,38,38,0.08);
+  border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 8px;
+  color: #dc2626;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.btn-reject:hover { background: rgba(220,38,38,0.15); }
+
+.request-timer { height: 3px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+.timer-bar     { height: 100%; background: var(--accent); width: 100%; }
+
+/* ── Document upload ──────────────────────────────────────────────────────── */
+.file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.file-label input[type="file"] {
+  padding: 0.4rem;
+  border: 1px solid rgba(0,0,0,0.09);
+  border-radius: 6px;
+  background: #f8fafc;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+/* ── Toast ────────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 3000;
+  background: rgba(7,11,18,0.92);
+  color: #f1f5f9;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

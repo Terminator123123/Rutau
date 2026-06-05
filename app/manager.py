@@ -1,15 +1,18 @@
+import asyncio
 import json
 import math
 import time
+import uuid
+from dataclasses import dataclass, field
 from fastapi import WebSocket
-from app.models import UserLocation
+from app.models import UserLocation, QUICK_MESSAGES
 
 MAX_PASSENGERS = 4
-ONBOARD_RADIUS_M = 50  # metros para considerar un estudiante "a bordo"
+ONBOARD_RADIUS_M = 50
+REQUEST_TIMEOUT_S = 40
 
 
 def haversine(lat1, lng1, lat2, lng2) -> float:
-    """Distance in meters between two GPS coordinates."""
     R = 6_371_000
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
@@ -18,22 +21,36 @@ def haversine(lat1, lng1, lat2, lng2) -> float:
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+@dataclass
+class TripRequest:
+    request_id:       str
+    student_session:  str
+    student_db_id:    int
+    student_name:     str
+    lat:              float
+    lng:              float
+    zone_destination: str
+    created_at:       float
+    candidates:       list   # ordered list of conductor session IDs
+    current_idx:      int = 0
+    timeout_task:     object = field(default=None, repr=False)
+
+
 class ConnectionManager:
     def __init__(self):
         self.active: dict[str, tuple[WebSocket, UserLocation | None]] = {}
         self.connected_at: dict[str, float] = {}
 
-    async def connect(self, websocket: WebSocket, user_id: str):
+    async def connect(self, websocket: WebSocket, session_id: str):
         await websocket.accept()
-        self.active[user_id] = (websocket, None)
-        self.connected_at[user_id] = time.time()
+        self.active[session_id] = (websocket, None)
+        self.connected_at[session_id] = time.time()
 
-    def set_location(self, user_id: str, location: UserLocation) -> UserLocation:
-        """Store location and recalculate onboard count if conductor."""
+    def set_location(self, session_id: str, location: UserLocation) -> UserLocation:
         if location.role == "conductor":
             location = self._update_conductor(location)
-        ws, _ = self.active[user_id]
-        self.active[user_id] = (ws, location)
+        ws, _ = self.active[session_id]
+        self.active[session_id] = (ws, location)
         return location
 
     def _update_conductor(self, conductor: UserLocation) -> UserLocation:
@@ -44,25 +61,35 @@ class ConnectionManager:
         )
         total = app_onboard + conductor.manual_passengers
         new_status = "lleno" if total >= MAX_PASSENGERS else conductor.status
+        return conductor.model_copy(update={"onboard_count": total, "status": new_status})
 
-        return conductor.model_copy(update={
-            "onboard_count": total,
-            "status": new_status,
-        })
+    def disconnect(self, session_id: str):
+        self.active.pop(session_id, None)
+        self.connected_at.pop(session_id, None)
 
-    def disconnect(self, user_id: str):
-        self.active.pop(user_id, None)
-        self.connected_at.pop(user_id, None)
-
-    def get_connected_at(self, user_id: str) -> float:
-        return self.connected_at.get(user_id, time.time())
+    def get_connected_at(self, session_id: str) -> float:
+        return self.connected_at.get(session_id, time.time())
 
     def get_all_locations(self) -> list[dict]:
-        return [
-            loc.model_dump()
-            for _, loc in self.active.values()
-            if loc is not None
-        ]
+        return [loc.model_dump() for _, loc in self.active.values() if loc is not None]
+
+    def get_approved_conductors_sorted(self, lat: float, lng: float) -> list[tuple[str, UserLocation]]:
+        """Returns list of (session_id, location) for approved conductors with available seats, sorted by distance."""
+        result = []
+        for sid, (_, loc) in self.active.items():
+            if loc and loc.role == "conductor" and loc.status != "lleno":
+                dist = haversine(lat, lng, loc.lat, loc.lng)
+                result.append((sid, loc, dist))
+        result.sort(key=lambda x: x[2])
+        return [(sid, loc) for sid, loc, _ in result]
+
+    async def send_to(self, session_id: str, payload: dict):
+        if session_id in self.active:
+            ws, _ = self.active[session_id]
+            try:
+                await ws.send_text(json.dumps(payload))
+            except Exception:
+                self.disconnect(session_id)
 
     async def broadcast(self, payload: dict):
         message = json.dumps(payload)
@@ -76,4 +103,245 @@ class ConnectionManager:
             self.disconnect(uid)
 
 
+class TripManager:
+    def __init__(self, conn: ConnectionManager):
+        self.conn = conn
+        # request_id → TripRequest
+        self.pending: dict[str, TripRequest] = {}
+        # student_session → request_id (max one active request per student)
+        self.by_student: dict[str, str] = {}
+        # session_id → trip_id (for active onboard trips)
+        self.active_trips: dict[str, int] = {}
+
+    async def create_request(self, student_session: str, student_db_id: int,
+                              student_name: str, lat: float, lng: float,
+                              zone: str, db) -> str | None:
+        # Cancel any existing request from this student
+        await self.cancel_request(student_session)
+
+        # Get approved conductors sorted by distance
+        # Only include conductors that have been approved (conductor_status == 'approved')
+        candidates_raw = self.conn.get_approved_conductors_sorted(lat, lng)
+        # Filter further: only approved conductors (db check already done at WS connect via manager field)
+        # We trust conductor_db_id is set only for approved conductors
+        candidates = [sid for sid, loc in candidates_raw if loc.conductor_db_id is not None]
+
+        if not candidates:
+            return None
+
+        request_id = str(uuid.uuid4())
+        req = TripRequest(
+            request_id=request_id,
+            student_session=student_session,
+            student_db_id=student_db_id,
+            student_name=student_name,
+            lat=lat,
+            lng=lng,
+            zone_destination=zone,
+            created_at=time.time(),
+            candidates=candidates,
+        )
+        self.pending[request_id] = req
+        self.by_student[student_session] = request_id
+
+        await self._notify_next(req)
+        return request_id
+
+    async def _notify_next(self, req: TripRequest):
+        if req.current_idx >= len(req.candidates):
+            # No more candidates — notify student
+            await self.conn.send_to(req.student_session, {
+                "type": "trip_rejected",
+                "request_id": req.request_id,
+                "reason": "no_conductors",
+            })
+            self._cleanup(req.request_id)
+            return
+
+        conductor_session = req.candidates[req.current_idx]
+
+        # Get conductor location for distance info
+        conductor_loc = None
+        if conductor_session in self.conn.active:
+            _, conductor_loc = self.conn.active[conductor_session]
+
+        dist = 0
+        if conductor_loc:
+            dist = int(haversine(req.lat, req.lng, conductor_loc.lat, conductor_loc.lng))
+
+        await self.conn.send_to(conductor_session, {
+            "type": "trip_request_incoming",
+            "request_id": req.request_id,
+            "student": {
+                "name": req.student_name,
+                "lat": req.lat,
+                "lng": req.lng,
+            },
+            "zone_destination": req.zone_destination,
+            "distance_m": dist,
+        })
+
+        # Start timeout
+        if req.timeout_task:
+            req.timeout_task.cancel()
+        req.timeout_task = asyncio.create_task(self._timeout(req.request_id))
+
+    async def _timeout(self, request_id: str):
+        await asyncio.sleep(REQUEST_TIMEOUT_S)
+        if request_id not in self.pending:
+            return
+        req = self.pending[request_id]
+        req.current_idx += 1
+        await self._notify_next(req)
+
+    async def accept_request(self, conductor_session: str, request_id: str, db) -> int | None:
+        """Returns trip_id if accepted successfully."""
+        if request_id not in self.pending:
+            return None
+        req = self.pending[request_id]
+
+        # Cancel timeout
+        if req.timeout_task:
+            req.timeout_task.cancel()
+
+        conductor_loc = None
+        conductor_db_id = None
+        if conductor_session in self.conn.active:
+            _, conductor_loc = self.conn.active[conductor_session]
+            if conductor_loc:
+                conductor_db_id = conductor_loc.conductor_db_id
+
+        # Create trip in DB
+        from app.database import Trip
+        trip = Trip(
+            conductor_id=conductor_db_id or 0,
+            student_id=req.student_db_id,
+            zone_destination=req.zone_destination,
+            status="accepted",
+            started_at=req.created_at,
+            accepted_at=time.time(),
+        )
+        db.add(trip)
+        db.commit()
+        db.refresh(trip)
+
+        self.active_trips[conductor_session] = trip.id
+        self.active_trips[req.student_session] = trip.id
+
+        self._cleanup(request_id)
+
+        # Notify student
+        conductor_info = {}
+        if conductor_loc:
+            conductor_info = {
+                "lat": conductor_loc.lat,
+                "lng": conductor_loc.lng,
+                "name": conductor_loc.name,
+                "zone": conductor_loc.zone_destination,
+                "rating": conductor_loc.rating_avg,
+            }
+
+        await self.conn.send_to(req.student_session, {
+            "type": "trip_accepted",
+            "request_id": request_id,
+            "trip_id": trip.id,
+            "conductor": conductor_info,
+        })
+
+        return trip.id
+
+    async def reject_request(self, conductor_session: str, request_id: str):
+        if request_id not in self.pending:
+            return
+        req = self.pending[request_id]
+        if req.timeout_task:
+            req.timeout_task.cancel()
+        req.current_idx += 1
+        await self._notify_next(req)
+
+    async def cancel_request(self, student_session: str):
+        request_id = self.by_student.get(student_session)
+        if not request_id or request_id not in self.pending:
+            return
+        req = self.pending[request_id]
+        if req.timeout_task:
+            req.timeout_task.cancel()
+        # Notify current conductor if any
+        if req.current_idx < len(req.candidates):
+            await self.conn.send_to(req.candidates[req.current_idx], {
+                "type": "trip_cancelled",
+                "request_id": request_id,
+            })
+        self._cleanup(request_id)
+
+    async def mark_onboard(self, conductor_session: str, trip_id: int, db):
+        from app.database import Trip
+        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if trip:
+            trip.status = "onboard"
+            trip.onboard_at = time.time()
+            db.commit()
+        # Find student session for this trip
+        for sid, tid in self.active_trips.items():
+            if tid == trip_id and sid != conductor_session:
+                await self.conn.send_to(sid, {"type": "onboard_confirmed", "trip_id": trip_id})
+                break
+
+    async def mark_dropoff(self, conductor_session: str, trip_id: int, student_db_id: int, db):
+        from app.database import Trip
+        from app.database import User
+        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if trip:
+            trip.status = "completed"
+            trip.ended_at = time.time()
+            db.commit()
+
+        conductor_name = ""
+        conductor_db_id = None
+        if conductor_session in self.conn.active:
+            _, loc = self.conn.active[conductor_session]
+            if loc:
+                conductor_name = loc.name
+                conductor_db_id = loc.conductor_db_id
+
+        # Find student session and send rate prompt
+        for sid, tid in list(self.active_trips.items()):
+            if tid == trip_id and sid != conductor_session:
+                await self.conn.send_to(sid, {
+                    "type": "rate_prompt",
+                    "trip_id": trip_id,
+                    "conductor_id": conductor_db_id,
+                    "conductor_name": conductor_name,
+                })
+                del self.active_trips[sid]
+                break
+
+        self.active_trips.pop(conductor_session, None)
+
+    async def send_quick_message(self, conductor_session: str, trip_id: int, message_key: str):
+        if message_key not in QUICK_MESSAGES:
+            return
+        conductor_name = ""
+        if conductor_session in self.conn.active:
+            _, loc = self.conn.active[conductor_session]
+            if loc:
+                conductor_name = loc.name
+
+        for sid, tid in self.active_trips.items():
+            if tid == trip_id and sid != conductor_session:
+                await self.conn.send_to(sid, {
+                    "type": "quick_message",
+                    "message_key": message_key,
+                    "message_text": QUICK_MESSAGES[message_key],
+                    "from_name": conductor_name,
+                })
+                break
+
+    def _cleanup(self, request_id: str):
+        req = self.pending.pop(request_id, None)
+        if req:
+            self.by_student.pop(req.student_session, None)
+
+
 manager = ConnectionManager()
+trip_manager = TripManager(manager)

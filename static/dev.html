@@ -12,23 +12,62 @@
 </head>
 <body>
 
-  <!-- Mapa siempre visible — fondo antes del login y app real después -->
+  <!-- Mapa siempre visible -->
   <div id="map-screen">
     <div id="topbar" class="hidden">
       <span id="role-badge"></span>
       <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
+      <!-- Selector de zona destino (solo conductor aprobado) -->
+      <select id="zone-select" class="hidden" onchange="setZone(this.value)">
+        <option value="">Selecciona zona destino</option>
+      </select>
       <div id="topbar-right">
         <span id="status-dot" class="dot connecting"></span>
         <span id="status-text">Conectando...</span>
         <button id="btn-logout" onclick="logout()">Salir</button>
       </div>
     </div>
+
     <div id="map"></div>
+
+    <!-- Acciones del estudiante -->
+    <div id="student-actions" class="hidden">
+      <button class="action-btn primary" onclick="requestRide()">Solicitar colectivo</button>
+      <button class="action-btn secondary" onclick="showNearby()">Ver conductores cercanos</button>
+    </div>
+
+    <!-- Estado de espera (solicitud activa) -->
+    <div id="waiting-overlay" class="hidden">
+      <div class="waiting-card">
+        <div class="waiting-spinner"></div>
+        <p class="waiting-title">Buscando conductor...</p>
+        <p class="waiting-sub" id="waiting-sub">Conectando con el más cercano</p>
+        <button class="btn-cancel-ride" onclick="cancelRide()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Panel de conductor asignado (estudiante, después de aceptar) -->
+    <div id="conductor-approaching" class="hidden">
+      <div class="approaching-card">
+        <p class="approaching-title">Conductor en camino</p>
+        <p id="approaching-name" class="approaching-name"></p>
+        <p id="approaching-zone" class="approaching-zone"></p>
+      </div>
+    </div>
+
+    <!-- Panel de pasajeros a bordo (conductor) -->
+    <div id="passengers-panel" class="hidden">
+      <div class="passengers-header">Pasajeros a bordo</div>
+      <div id="passengers-list"></div>
+    </div>
+
+    <!-- Contador de pasajeros manuales (conductor) -->
     <div id="passenger-counter" class="hidden">
       <button class="btn-manual" onclick="removeManual()">−</button>
       <span id="counter-display">0/4</span>
       <button class="btn-manual" onclick="addManual()">+</button>
     </div>
+
     <div id="legend" class="hidden">
       <span><span class="dot-legend blue"></span>Estudiantes</span>
       <span><span class="dot-legend orange"></span>Disponible</span>
@@ -37,10 +76,9 @@
     </div>
   </div>
 
-  <!-- Auth card flota sobre el mapa — desaparece al iniciar sesión -->
+  <!-- Auth screen -->
   <div id="auth-screen">
     <div class="auth-overlay"></div>
-
     <div class="auth-card">
       <div class="auth-brand">
         <div class="brand-mark">U</div>
@@ -75,8 +113,78 @@
           </div>
         </div>
         <input type="hidden" id="reg-role" value="estudiante" />
+        <!-- T&C checkbox -->
+        <label class="terms-label">
+          <input type="checkbox" id="terms-check" required />
+          <span>Acepto los <button type="button" class="btn-terms-link" onclick="showTermsModal()">términos y condiciones</button></span>
+        </label>
         <div id="register-msg" class="form-msg hidden"></div>
         <button type="submit" class="btn-primary">Crear cuenta</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal T&C -->
+  <div id="terms-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h2 class="modal-title">Términos y condiciones</h2>
+      <div class="terms-body">
+        <p><strong>ColectivoU</strong> es una plataforma de coordinación de transporte. No somos una empresa de transporte ni operamos vehículos.</p>
+        <p>Los conductores son independientes y son responsables de sus vehículos, pasajeros y cumplimiento de normas de tránsito.</p>
+        <p>ColectivoU no se responsabiliza por accidentes, pérdidas o daños ocurridos durante el viaje.</p>
+        <p>El pago de $3.000 COP es acordado directamente entre el conductor y el pasajero. ColectivoU no intermedia pagos.</p>
+        <p>Los conductores deben subir documentos verídicos (cédula, SOAT, placa). El suministro de información falsa resulta en bloqueo permanente.</p>
+        <p>Al usar la plataforma aceptas que tus datos básicos (nombre, ubicación en tiempo real) sean compartidos con otros usuarios durante el uso activo de la app.</p>
+      </div>
+      <button class="btn-primary" onclick="closeTermsModal()">Entendido</button>
+    </div>
+  </div>
+
+  <!-- Modal de calificación -->
+  <div id="rating-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h2 class="modal-title">¿Cómo fue tu viaje?</h2>
+      <p id="rating-conductor-name" class="rating-conductor"></p>
+      <div id="stars" class="stars-row">
+        <span class="star" data-v="1" onclick="selectStar(1)">★</span>
+        <span class="star" data-v="2" onclick="selectStar(2)">★</span>
+        <span class="star" data-v="3" onclick="selectStar(3)">★</span>
+        <span class="star" data-v="4" onclick="selectStar(4)">★</span>
+        <span class="star" data-v="5" onclick="selectStar(5)">★</span>
+      </div>
+      <div id="rating-msg" class="form-msg hidden"></div>
+      <button class="btn-primary" onclick="submitRating()">Calificar</button>
+      <button class="btn-link" onclick="skipRating()">Omitir</button>
+    </div>
+  </div>
+
+  <!-- Modal solicitud de viaje entrante (conductor) -->
+  <div id="request-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h2 class="modal-title">Solicitud de viaje</h2>
+      <p id="request-student-name" class="request-student"></p>
+      <p id="request-distance" class="request-distance"></p>
+      <p id="request-zone" class="request-zone"></p>
+      <div class="request-btns">
+        <button class="btn-accept" onclick="acceptRequest()">Aceptar</button>
+        <button class="btn-reject" onclick="rejectRequest()">Rechazar</button>
+      </div>
+      <div class="request-timer"><div id="request-timer-bar" class="timer-bar"></div></div>
+    </div>
+  </div>
+
+  <!-- Panel de documentos (conductor pendiente) -->
+  <div id="docs-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h2 class="modal-title">Verificación de conductor</h2>
+      <p class="modal-sub">Sube tus documentos para que podamos aprobar tu cuenta.</p>
+      <form id="docs-form" onsubmit="uploadDocuments(event)">
+        <label class="file-label">Foto de cédula <input type="file" name="cedula" accept="image/*,.pdf" required /></label>
+        <label class="file-label">Selfie con cédula <input type="file" name="selfie" accept="image/*" required /></label>
+        <label class="file-label">Foto de placa <input type="file" name="plate" accept="image/*" required /></label>
+        <label class="file-label">SOAT vigente <input type="file" name="soat" accept="image/*,.pdf" required /></label>
+        <div id="docs-msg" class="form-msg hidden"></div>
+        <button type="submit" class="btn-primary">Enviar documentos</button>
       </form>
     </div>
   </div>

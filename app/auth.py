@@ -61,6 +61,18 @@ def get_current_user(
     return user
 
 
+def get_approved_conductor(user: User = Depends(get_current_user)) -> User:
+    """Dependencia para endpoints exclusivos de conductores aprobados."""
+    if user.role != "conductor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo conductores pueden acceder a esto")
+    if user.conductor_status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta de conductor está pendiente de aprobación"
+        )
+    return user
+
+
 def get_user_from_cookie(cookie_value: str | None, db: Session) -> User | None:
     """Used by WebSocket — reads token from cookie value."""
     if not cookie_value:
