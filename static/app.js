@@ -43,7 +43,14 @@ window.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(location.search);
   if (params.get("verified") === "1") showVerifiedBanner();
   const saved = readSessionCookie();
-  if (saved) { currentUser = saved; startMap(); }
+  if (saved) {
+    currentUser = saved;
+    fetch("/me", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(full => { if (full) currentUser = full; })
+      .catch(() => {})
+      .finally(() => startMap());
+  }
 });
 
 function showVerifiedBanner() {
@@ -240,15 +247,34 @@ function startMap() {
   myStatus = currentUser.role === "conductor" ? "disponible" : null;
   manualPassengers = 0;
 
-  const badge = document.getElementById("role-badge");
-  badge.textContent = currentUser.name + " · " + (currentUser.role === "estudiante" ? "Estudiante" : "Conductor");
+  // Profile card
+  document.getElementById("tb-name").textContent = currentUser.name;
+  document.getElementById("tb-stars").innerHTML  = renderStarRow(
+    currentUser.rating_avg, currentUser.rating_count, "0.65rem"
+  );
+
+  const isApproved = currentUser.role === "conductor" && currentUser.conductor_status === "approved";
+  const isPending  = currentUser.role === "conductor" && currentUser.conductor_status !== "approved";
 
   if (currentUser.role === "conductor") {
-    document.getElementById("btn-status").classList.remove("hidden");
-    document.getElementById("passenger-counter").classList.remove("hidden");
-    document.getElementById("passengers-panel").classList.remove("hidden");
-    updateStatusButton();
-    updateCounterDisplay(0);
+    if (isApproved) {
+      document.getElementById("btn-status").classList.remove("hidden");
+      document.getElementById("passenger-counter").classList.remove("hidden");
+      document.getElementById("passengers-panel").classList.remove("hidden");
+      updateStatusButton();
+      updateCounterDisplay(0);
+    } else {
+      const pbTitle = document.getElementById("pb-title");
+      if (currentUser.conductor_status === "rejected") {
+        pbTitle.textContent = "Verificación rechazada";
+        document.getElementById("pending-banner").style.borderColor = "rgba(239,68,68,0.3)";
+        document.getElementById("pending-banner").querySelector(".pb-inner").style.background = "rgba(239,68,68,0.08)";
+        pbTitle.style.color = "#f87171";
+        document.getElementById("pending-banner").querySelector(".pb-btn").style.borderColor = "rgba(239,68,68,0.3)";
+        document.getElementById("pending-banner").querySelector(".pb-btn").style.color = "#f87171";
+      }
+      document.getElementById("pending-banner").classList.remove("hidden");
+    }
   } else {
     document.getElementById("student-actions").classList.remove("hidden");
   }
@@ -267,17 +293,11 @@ function startMap() {
     document.getElementById("legend").classList.remove("hidden");
     map.invalidateSize();
     requestLocation();
-
-    // Conductor pending → show docs modal
-    if (currentUser.role === "conductor" && currentUser.conductor_status === "pending") {
-      if (!currentUser.has_documents) {
-        setTimeout(showDocsModal, 800);
-      }
-    }
   }, 580);
 }
 
 async function logout() {
+  closeDrawer();
   try { await fetch("/logout", { method: "POST", credentials: "include" }); } catch (_) {}
   currentUser = null;
   cleanup();
@@ -291,6 +311,7 @@ async function logout() {
   document.getElementById("waiting-overlay").classList.add("hidden");
   document.getElementById("conductor-approaching").classList.add("hidden");
   document.getElementById("zone-select").classList.add("hidden");
+  document.getElementById("pending-banner").classList.add("hidden");
 
   const authScreen = document.getElementById("auth-screen");
   const card       = authScreen.querySelector(".auth-card");
@@ -775,6 +796,78 @@ function setLoading(btn, loading) {
   btn.disabled = loading;
   if (loading) { btn._orig = btn.textContent; btn.innerHTML = '<span class="spinner"></span>'; }
   else { btn.textContent = btn._orig || btn.textContent; }
+}
+
+// ── Drawer ─────────────────────────────────────────────────────────────────
+
+function openDrawer() {
+  if (!currentUser) return;
+
+  document.getElementById("dr-name").textContent      = currentUser.name;
+  document.getElementById("dr-role-badge").textContent =
+    currentUser.role === "conductor" ? "Conductor" : "Estudiante";
+  document.getElementById("dr-stars").innerHTML = renderStarRow(
+    currentUser.rating_avg, currentUser.rating_count, "0.82rem"
+  );
+
+  const condSection = document.getElementById("dr-conductor");
+  if (currentUser.role === "conductor") {
+    condSection.classList.remove("hidden");
+    const map = {
+      pending:  { text: "Pendiente de revisión", cls: "pending"  },
+      approved: { text: "Cuenta verificada ✓",   cls: "approved" },
+      rejected: { text: "Verificación rechazada", cls: "rejected" },
+    };
+    const s = map[currentUser.conductor_status] || map.pending;
+    document.getElementById("dr-verify-row").innerHTML =
+      `<span class="verify-badge ${s.cls}">${s.text}</span>`;
+  } else {
+    condSection.classList.add("hidden");
+  }
+
+  const overlay = document.getElementById("drawer-overlay");
+  const drawer  = document.getElementById("drawer");
+  overlay.classList.remove("hidden");
+  drawer.classList.remove("hidden");
+  requestAnimationFrame(() => requestAnimationFrame(() => drawer.classList.add("open")));
+}
+
+function closeDrawer() {
+  const drawer  = document.getElementById("drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (!drawer || drawer.classList.contains("hidden")) return;
+  drawer.classList.remove("open");
+  setTimeout(() => {
+    drawer.classList.add("hidden");
+    overlay.classList.add("hidden");
+  }, 290);
+}
+
+// ── Stars renderer ─────────────────────────────────────────────────────────
+
+function renderStarRow(avg, count, size = "0.7rem") {
+  if (avg == null || !count) {
+    return `<span class="no-rating" style="font-size:${size}">Sin calificaciones</span>`;
+  }
+  const full = Math.floor(avg);
+  const half = (avg - full) >= 0.5;
+  let html = `<span class="stars-inline" style="font-size:${size}">`;
+  for (let i = 1; i <= 5; i++) {
+    if (i <= full) html += '<span class="si active">★</span>';
+    else if (i === full + 1 && half) html += '<span class="si half">★</span>';
+    else html += '<span class="si">★</span>';
+  }
+  html += `</span><span class="rating-num" style="font-size:${size}">${avg} (${count})</span>`;
+  return html;
+}
+
+// ── Delete account ─────────────────────────────────────────────────────────
+
+function confirmDelete() {
+  if (!window.confirm("¿Eliminar tu cuenta? Esta acción es irreversible.")) return;
+  fetch("/me", { method: "DELETE", credentials: "include" })
+    .then(r => { if (r.ok) logout(); else showToast("Error al eliminar la cuenta."); })
+    .catch(() => showToast("Error de red."));
 }
 
 function setStatus(state, text) {

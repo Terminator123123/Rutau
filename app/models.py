@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     role:             str
     conductor_status: Optional[str] = None
     rating_avg:       Optional[float] = None
+    rating_count:     Optional[int] = None
 
 
 class TokenResponse(BaseModel):

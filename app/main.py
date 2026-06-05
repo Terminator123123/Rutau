@@ -93,6 +93,11 @@ async def dev():
     return FileResponse("static/dev.html")
 
 
+@app.get("/admin-panel", include_in_schema=False)
+async def admin_panel_page():
+    return FileResponse("static/admin.html")
+
+
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/register", response_model=UserOut, tags=["Auth"])
@@ -178,6 +183,15 @@ def logout(response: Response):
 @app.get("/me", response_model=UserOut, tags=["Auth"])
 def me(current_user: User = Depends(get_current_user)):
     return _user_out(current_user)
+
+
+@app.delete("/me", tags=["Auth"])
+def delete_me(response: Response, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db.delete(current_user)
+    db.commit()
+    response.delete_cookie(key=COOKIE_NAME)
+    response.delete_cookie(key=INFO_COOKIE_NAME)
+    return {"message": "Cuenta eliminada"}
 
 
 @app.post("/forgot-password", tags=["Auth"])
@@ -614,13 +628,12 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _user_out(user: User) -> UserOut:
-    avg = None
-    if user.rating_count and user.rating_count > 0:
-        avg = round((user.rating_sum or 0) / user.rating_count, 1)
+    count = user.rating_count or 0
+    avg = round((user.rating_sum or 0) / count, 1) if count > 0 else None
     return UserOut(
         id=user.id, name=user.name, email=user.email,
         role=user.role, conductor_status=user.conductor_status,
-        rating_avg=avg,
+        rating_avg=avg, rating_count=count,
     )
 
 
