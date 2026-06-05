@@ -204,6 +204,15 @@ function showDocsModal() {
   document.getElementById("docs-modal").classList.remove("hidden");
 }
 
+function closeDocsModal() {
+  document.getElementById("docs-modal").classList.add("hidden");
+  document.getElementById("docs-msg").className = "form-msg hidden";
+}
+
+function closeSelf(e) {
+  if (e.target === e.currentTarget) closeDocsModal();
+}
+
 async function uploadDocuments(e) {
   e.preventDefault();
   const msgEl = document.getElementById("docs-msg");
