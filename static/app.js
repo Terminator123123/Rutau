@@ -668,21 +668,21 @@ function updateCounterDisplay(total) {
 // ── Markers ────────────────────────────────────────────────────────────────
 
 function markerColor(user) {
-  if (user.role === "estudiante")  return "#0ea5e9";
-  if (user.status === "lleno")     return "#ef4444";
-  if (user.status === "en camino") return "#eab308";
-  return "#f97316";
+  if (user.role === "estudiante") return "#0ea5e9";
+  if (user.status === "lleno")    return "#ef4444";
+  return "#22c55e";
 }
 
 function buildIcon(user, isMe) {
   if (user.role === "conductor") {
-    const size = isMe ? 44 : 32;
-    const statusColor = markerColor(user);
+    const size  = isMe ? 44 : 32;
+    const color = markerColor(user);
     return L.divIcon({
       className: "",
-      html: `<div style="position:relative;width:${size}px;height:${size}px">
-        <img src="/static/carrito.png" style="width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))"/>
-        <span style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:${statusColor};border:2px solid #fff;display:block"></span>
+      html: `<div style="position:relative;width:${size}px;height:${size}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35))">
+        <svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${color}">
+          <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+        </svg>
       </div>`,
       iconSize: [size, size], iconAnchor: [size / 2, size / 2],
     });
