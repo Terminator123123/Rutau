@@ -131,6 +131,12 @@
       </button>
     </div>
 
+    <button class="dr-item" onclick="openEditModal(); closeDrawer()">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+      </svg>
+      Editar nombre / contraseña
+    </button>
     <div class="dr-divider"></div>
 
     <button class="dr-item" onclick="logout()">
@@ -264,7 +270,20 @@
       <button type="button" class="btn-link" onclick="closeDocsModal()">Ahora no</button>
     </div>
   </div>
-
+  
+<!-- Modal editar perfil -->
+<div id="edit-modal" class="modal-backdrop hidden">
+  <div class="modal-card">
+    <h2 class="modal-title">Editar perfil</h2>
+    <form onsubmit="saveProfile(event)">
+      <input type="text" id="edit-name" placeholder="Nuevo nombre" maxlength="40" autocomplete="name" />
+      <input type="password" id="edit-password" placeholder="Nueva contraseña (mín. 6)" minlength="6" autocomplete="new-password" />
+      <div id="edit-msg" class="form-msg hidden"></div>
+      <button type="submit" class="btn-primary">Guardar</button>
+    </form>
+    <button type="button" class="btn-link" onclick="closeEditModal()">Cancelar</button>
+  </div>
+</div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/static/app.js"></script>
 </body>

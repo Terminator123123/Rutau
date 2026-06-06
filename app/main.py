@@ -193,6 +193,21 @@ def delete_me(response: Response, current_user: User = Depends(get_current_user)
     response.delete_cookie(key=INFO_COOKIE_NAME)
     return {"message": "Cuenta eliminada"}
 
+@app.patch("/me", response_model=UserOut, tags=["Auth"])
+def update_me(body: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    new_name = (body.get("name") or "").strip()
+    new_pass = body.get("password") or ""
+    if not new_name and not new_pass:
+        raise HTTPException(status_code=400, detail="Nada que actualizar")
+    if new_name:
+        current_user.name = new_name
+    if new_pass:
+        if len(new_pass) < 6:
+            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+        current_user.hashed_password = hash_password(new_pass)
+    db.commit()
+    db.refresh(current_user)
+    return _user_out(current_user)
 
 @app.post("/forgot-password", tags=["Auth"])
 def forgot_password(body: ForgotPasswordRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
