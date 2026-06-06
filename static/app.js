@@ -904,3 +904,51 @@ function cleanup() {
   manualPassengers = 0; activeRequestId = null; activeTripId = null;
   currentZone = ""; showingNearby = false;
 }
+
+function openEditModal() {
+  document.getElementById("edit-name").value = currentUser.name || "";
+  document.getElementById("edit-password").value = "";
+  document.getElementById("edit-msg").classList.add("hidden");
+  document.getElementById("edit-modal").classList.remove("hidden");
+}
+
+function closeEditModal() {
+  document.getElementById("edit-modal").classList.add("hidden");
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+  const name     = document.getElementById("edit-name").value.trim();
+  const password = document.getElementById("edit-password").value;
+  const msg      = document.getElementById("edit-msg");
+  const body     = {};
+  if (name && name !== currentUser.name) body.name = name;
+  if (password) body.password = password;
+  if (!Object.keys(body).length) {
+    msg.textContent = "No hay cambios.";
+    msg.style.color = "#94a3b8";
+    msg.classList.remove("hidden");
+    return;
+  }
+  const r = await fetch("/me", {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (r.ok) {
+    const updated = await r.json();
+    currentUser = updated;
+    document.getElementById("tb-name").textContent = updated.name;
+    document.getElementById("dr-name").textContent = updated.name;
+    msg.textContent = "¡Guardado!";
+    msg.style.color = "#22c55e";
+    msg.classList.remove("hidden");
+    setTimeout(() => closeEditModal(), 1200);
+  } else {
+    const err = await r.json().catch(() => ({}));
+    msg.textContent = err.detail || "Error al guardar.";
+    msg.style.color = "#ef4444";
+    msg.classList.remove("hidden");
+  }
+}
