@@ -681,7 +681,7 @@ function buildIcon(user, isMe) {
     return L.divIcon({
       className: "",
       html: `<div style="position:relative;width:${size}px;height:${size}px">
-        <img src="/static/carrito.png" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"/>
+        <img src="/static/carrito.png" style="width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))"/>
         <span style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:${statusColor};border:2px solid #fff;display:block"></span>
       </div>`,
       iconSize: [size, size], iconAnchor: [size / 2, size / 2],
