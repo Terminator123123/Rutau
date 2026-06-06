@@ -47,6 +47,25 @@ def admin_verify_user(email: str, db: Session = Depends(get_db), _=Depends(requi
     return {"message": f"Usuario {email} verificado", "user": {"id": user.id, "name": user.name}}
 
 
+@router.get("/admin/conductors")
+def admin_all_conductors(db: Session = Depends(get_db), _=Depends(require_admin)):
+    users = db.query(User).filter(User.role == "conductor").order_by(User.id).all()
+    return [
+        {
+            "id": u.id, "name": u.name, "email": u.email,
+            "conductor_status": u.conductor_status,
+            "is_verified": u.is_verified,
+            "has_cedula": bool(u.cedula_path),
+            "has_selfie": bool(u.selfie_path),
+            "has_plate":  bool(u.plate_path),
+            "has_soat":   bool(u.soat_path),
+            "rating_avg": round(u.rating_sum / u.rating_count, 1) if u.rating_count else None,
+            "rating_count": u.rating_count,
+        }
+        for u in users
+    ]
+
+
 @router.get("/admin/conductors/pending")
 def admin_pending_conductors(db: Session = Depends(get_db), _=Depends(require_admin)):
     users = db.query(User).filter(
@@ -84,6 +103,21 @@ def admin_reject_conductor(user_id: int, db: Session = Depends(get_db), _=Depend
     user.conductor_status = "rejected"
     db.commit()
     return {"message": f"Conductor {user.name} rechazado"}
+
+
+@router.get("/admin/conductors/{user_id}/doc/{doc_type}")
+def admin_get_conductor_doc(user_id: int, doc_type: str, db: Session = Depends(get_db), _=Depends(require_admin)):
+    """Sirve un documento de conductor por tipo (cedula, selfie, plate, soat)."""
+    if doc_type not in ("cedula", "selfie", "plate", "soat"):
+        raise HTTPException(400, "Tipo de documento inválido")
+    user = db.query(User).filter(User.id == user_id, User.role == "conductor").first()
+    if not user:
+        raise HTTPException(404, "Conductor no encontrado")
+    path_map = {"cedula": user.cedula_path, "selfie": user.selfie_path, "plate": user.plate_path, "soat": user.soat_path}
+    filepath = path_map[doc_type]
+    if not filepath or not os.path.exists(filepath):
+        raise HTTPException(404, "Documento no disponible")
+    return FileResponse(filepath)
 
 
 @router.get("/admin/documents/{user_id}/{filename}")

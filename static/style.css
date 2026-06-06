@@ -45,7 +45,7 @@ html, body {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(241, 245, 249, 0.35);
+  background: radial-gradient(ellipse at center, rgba(241,245,249,0.42) 0%, rgba(203,213,225,0.28) 100%);
   backdrop-filter: blur(2px) brightness(0.92);
   -webkit-backdrop-filter: blur(2px) brightness(0.92);
   transition: opacity 0.55s ease, backdrop-filter 0.55s ease;
@@ -58,19 +58,23 @@ html, body {
   width: 100%;
   max-width: 368px;
   padding: 2.25rem 2rem;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.14), 0 4px 16px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(160deg, #ffffff 0%, #f8faff 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(37, 99, 235, 0.1);
+  border-top: 2px solid rgba(37, 99, 235, 0.22);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 64px rgba(37, 99, 235, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
   animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ── Brand ───────────────────────────────────────────────────────────────── */
@@ -84,22 +88,24 @@ html, body {
 }
 
 .brand-mark {
-  width: 38px;
-  height: 38px;
-  border: 1.5px solid rgba(37, 99, 235, 0.35);
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(37,99,235,0.18) 100%);
+  border: 1.5px solid rgba(37, 99, 235, 0.28);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 800;
   color: var(--accent);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.14);
 }
 
 .auth-brand h1 {
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   color: var(--text);
   line-height: 1;
 }
@@ -116,9 +122,9 @@ html, body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3px;
-  background: #f1f5f9;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 9px;
   padding: 3px;
   margin-bottom: 1.5rem;
 }
@@ -126,7 +132,7 @@ html, body {
 .tab {
   padding: 0.55rem;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
   font-family: var(--font);
@@ -139,7 +145,8 @@ html, body {
 .tab.active {
   background: #fff;
   color: var(--accent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 6px rgba(37, 99, 235, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  font-weight: 600;
 }
 
 .tab:hover:not(.active) { color: var(--text); }
@@ -261,22 +268,25 @@ html, body {
   width: 100%;
   padding: 0.8rem;
   margin-top: 0.25rem;
-  background: var(--accent);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #fff;
   font-family: var(--font);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: opacity 0.18s, transform 0.18s;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.28);
+  transition: box-shadow 0.18s, transform 0.18s, opacity 0.18s;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-.btn-primary:active { transform: translateY(0); opacity: 1; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.42), 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.btn-primary:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .btn-link {
   display: block;

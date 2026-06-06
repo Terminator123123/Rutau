@@ -6,20 +6,21 @@
   <title>Panel Admin — ColectivoU</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:       #0a0f1e;
-      --surface:  #111827;
-      --surface2: #1e2a3a;
-      --border:   rgba(255,255,255,0.07);
+      --bg:       #f8fafc;
+      --surface:  #ffffff;
+      --surface2: #f1f5f9;
+      --border:   rgba(0,0,0,0.08);
       --accent:   #2563eb;
-      --text:     #f1f5f9;
+      --text:     #1e293b;
       --muted:    #64748b;
-      --success:  #22c55e;
-      --warning:  #f59e0b;
-      --danger:   #ef4444;
+      --success:  #16a34a;
+      --warning:  #d97706;
+      --danger:   #dc2626;
       --font:     'Outfit', sans-serif;
     }
 
@@ -40,16 +41,18 @@
       align-items: center;
       justify-content: center;
       padding: 1rem;
+      background: linear-gradient(135deg, #f0f4ff 0%, #f8fafc 60%, #eff6ff 100%);
     }
 
     .login-card {
       background: var(--surface);
       border: 1px solid var(--border);
+      border-top: 2px solid rgba(37,99,235,0.25);
       border-radius: 16px;
       padding: 2.5rem 2rem;
       width: 100%;
       max-width: 380px;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      box-shadow: 0 20px 60px rgba(37,99,235,0.1), 0 4px 16px rgba(0,0,0,0.06);
     }
 
     .login-brand {
@@ -61,17 +64,18 @@
     }
 
     .login-brand-mark {
-      width: 44px; height: 44px;
-      background: rgba(37,99,235,0.15);
-      border: 1px solid rgba(37,99,235,0.3);
-      border-radius: 10px;
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(37,99,235,0.18) 100%);
+      border: 1.5px solid rgba(37,99,235,0.25);
+      border-radius: 12px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem; font-weight: 800; color: #60a5fa;
+      font-size: 1.2rem; font-weight: 800; color: var(--accent);
+      box-shadow: 0 2px 8px rgba(37,99,235,0.12);
     }
 
     .login-brand h1 {
-      font-size: 1.4rem; font-weight: 700; color: var(--text);
-      letter-spacing: -0.02em;
+      font-size: 1.5rem; font-weight: 800; color: var(--text);
+      letter-spacing: -0.03em;
     }
 
     .login-brand p { font-size: 0.78rem; color: var(--muted); }
@@ -88,52 +92,49 @@
     .field input {
       width: 100%;
       padding: 0.75rem 0.9rem;
-      background: rgba(255,255,255,0.04);
+      background: var(--surface2);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text);
       font-family: var(--font); font-size: 0.9rem;
       outline: none;
-      transition: border-color 0.18s, box-shadow 0.18s;
+      transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
     }
 
     .field input:focus {
-      border-color: rgba(37,99,235,0.5);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+      border-color: rgba(37,99,235,0.4);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
     }
 
     .btn-login {
       width: 100%;
       padding: 0.85rem;
-      background: var(--accent);
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
       border: none; border-radius: 8px;
       color: #fff; font-family: var(--font);
       font-size: 0.9rem; font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.18s, transform 0.18s;
-      box-shadow: 0 4px 16px rgba(37,99,235,0.35);
+      transition: box-shadow 0.18s, transform 0.18s;
+      box-shadow: 0 4px 14px rgba(37,99,235,0.35);
       margin-top: 0.5rem;
     }
 
-    .btn-login:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-login:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.42); }
     .btn-login:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
     .login-err {
       margin-top: 0.75rem;
       padding: 0.55rem 0.8rem;
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.25);
+      background: rgba(220,38,38,0.06);
+      border: 1px solid rgba(220,38,38,0.2);
       border-radius: 6px;
-      font-size: 0.8rem; color: #fca5a5;
+      font-size: 0.8rem; color: var(--danger);
       text-align: center;
     }
 
     /* ── Dashboard ── */
-    #dashboard {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+    #dashboard { min-height: 100vh; display: flex; flex-direction: column; }
 
     /* Header */
     .adm-header {
@@ -143,19 +144,18 @@
       height: 56px;
       display: flex; align-items: center; gap: 1rem;
       position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
 
-    .adm-logo {
-      display: flex; align-items: center; gap: 0.65rem;
-    }
+    .adm-logo { display: flex; align-items: center; gap: 0.65rem; }
 
     .adm-logo-mark {
-      width: 28px; height: 28px;
-      background: rgba(37,99,235,0.15);
-      border: 1px solid rgba(37,99,235,0.3);
-      border-radius: 6px;
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(37,99,235,0.2) 100%);
+      border: 1px solid rgba(37,99,235,0.22);
+      border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.75rem; font-weight: 800; color: #60a5fa;
+      font-size: 0.8rem; font-weight: 800; color: var(--accent);
     }
 
     .adm-logo-text { font-size: 0.9rem; font-weight: 700; color: var(--text); }
@@ -163,23 +163,34 @@
 
     .adm-spacer { flex: 1; }
 
-    .adm-user-info {
-      font-size: 0.75rem; color: var(--muted);
+    .adm-user-info { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+
+    .btn-map {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.35rem 0.85rem;
+      background: rgba(37,99,235,0.07);
+      border: 1px solid rgba(37,99,235,0.2);
+      border-radius: 7px;
+      color: var(--accent); font-family: var(--font);
+      font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; transition: all 0.18s;
     }
+
+    .btn-map:hover { background: rgba(37,99,235,0.13); }
 
     .btn-adm-logout {
       padding: 0.3rem 0.75rem;
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.2);
+      background: rgba(220,38,38,0.06);
+      border: 1px solid rgba(220,38,38,0.18);
       border-radius: 6px;
-      color: #f87171; font-family: var(--font);
+      color: var(--danger); font-family: var(--font);
       font-size: 0.75rem; font-weight: 500;
       cursor: pointer; transition: background 0.18s;
     }
 
-    .btn-adm-logout:hover { background: rgba(239,68,68,0.16); }
+    .btn-adm-logout:hover { background: rgba(220,38,38,0.12); }
 
-    /* Main content */
+    /* Main */
     .adm-main {
       padding: 1.5rem;
       max-width: 1200px;
@@ -188,7 +199,7 @@
       flex: 1;
     }
 
-    /* Stats row */
+    /* Stats */
     .stats-row {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -201,6 +212,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 1.25rem 1.25rem 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
 
     .stat-card .stat-num {
@@ -213,11 +225,11 @@
       color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
     }
 
-    .stat-card.c-total   .stat-num { color: #60a5fa; }
-    .stat-card.c-stud    .stat-num { color: #34d399; }
-    .stat-card.c-cond    .stat-num { color: #818cf8; }
-    .stat-card.c-pend    .stat-num { color: #fbbf24; }
-    .stat-card.c-active  .stat-num { color: #fb7185; }
+    .stat-card.c-total   .stat-num { color: #2563eb; }
+    .stat-card.c-stud    .stat-num { color: #059669; }
+    .stat-card.c-cond    .stat-num { color: #7c3aed; }
+    .stat-card.c-pend    .stat-num { color: #d97706; }
+    .stat-card.c-active  .stat-num { color: #dc2626; }
 
     /* Section headers */
     .section-head {
@@ -234,11 +246,11 @@
     .section-badge {
       display: inline-block;
       padding: 0.15rem 0.55rem;
-      background: rgba(251,191,36,0.1);
-      border: 1px solid rgba(251,191,36,0.25);
+      background: rgba(217,119,6,0.1);
+      border: 1px solid rgba(217,119,6,0.22);
       border-radius: 20px;
       font-size: 0.65rem; font-weight: 700;
-      color: #fbbf24;
+      color: var(--warning);
     }
 
     /* Pending conductor cards */
@@ -252,30 +264,28 @@
     .cond-card {
       background: var(--surface);
       border: 1px solid var(--border);
+      border-left: 3px solid var(--warning);
       border-radius: 12px;
       padding: 1.25rem;
       display: flex; flex-direction: column; gap: 0.85rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
 
-    .cond-card-head {
-      display: flex; align-items: center; gap: 0.75rem;
-    }
+    .cond-card-head { display: flex; align-items: center; gap: 0.75rem; }
 
     .cond-mini-avatar {
       width: 40px; height: 40px; border-radius: 50%;
-      background: rgba(37,99,235,0.15);
-      border: 1px solid rgba(37,99,235,0.25);
+      background: rgba(37,99,235,0.08);
+      border: 1px solid rgba(37,99,235,0.18);
       display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; font-weight: 700; color: #93c5fd;
+      font-size: 1rem; font-weight: 700; color: var(--accent);
       flex-shrink: 0;
     }
 
     .cond-card-name { font-size: 0.95rem; font-weight: 600; color: var(--text); }
     .cond-card-email { font-size: 0.72rem; color: var(--muted); }
 
-    .docs-row {
-      display: flex; gap: 0.5rem; flex-wrap: wrap;
-    }
+    .docs-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
     .doc-chip {
       display: flex; align-items: center; gap: 0.3rem;
@@ -283,8 +293,8 @@
       border-radius: 6px; font-size: 0.68rem; font-weight: 600;
     }
 
-    .doc-chip.ok      { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.25);  color: #4ade80; }
-    .doc-chip.missing { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);  color: #f87171; }
+    .doc-chip.ok      { background: rgba(22,163,74,0.08);  border: 1px solid rgba(22,163,74,0.2);  color: #16a34a; }
+    .doc-chip.missing { background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.18); color: var(--danger); }
 
     .cond-actions { display: flex; gap: 0.5rem; }
 
@@ -296,20 +306,11 @@
       border: 1px solid;
     }
 
-    .btn-approve {
-      background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #4ade80;
-    }
+    .btn-approve  { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.22); color: #16a34a; }
+    .btn-reject-c { background: rgba(220,38,38,0.06); border-color: rgba(220,38,38,0.18); color: var(--danger); }
+    .btn-docs     { background: var(--surface2); border-color: var(--border); color: var(--muted); flex:0; padding: 0.5rem 0.75rem; }
 
-    .btn-reject-c {
-      background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); color: #f87171;
-    }
-
-    .btn-docs {
-      background: rgba(255,255,255,0.04); border-color: var(--border); color: var(--muted);
-      flex: 0; padding: 0.5rem 0.75rem;
-    }
-
-    .btn-approve:hover, .btn-reject-c:hover, .btn-docs:hover { opacity: 0.75; }
+    .btn-approve:hover, .btn-reject-c:hover, .btn-docs:hover { opacity: 0.7; }
 
     .no-pending {
       padding: 1.5rem;
@@ -320,7 +321,95 @@
       color: var(--muted);
       font-size: 0.85rem;
       margin-bottom: 2.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     }
+
+    /* ── Conductor data section ── */
+    #cond-filter-tabs {
+      display: flex; gap: 0.35rem; margin-bottom: 1rem; flex-wrap: wrap;
+    }
+
+    .cond-filter-btn {
+      padding: 0.3rem 0.8rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted); font-family: var(--font);
+      font-size: 0.72rem; font-weight: 500;
+      cursor: pointer; transition: all 0.18s;
+    }
+
+    .cond-filter-btn.active {
+      background: rgba(37,99,235,0.08);
+      border-color: rgba(37,99,235,0.25);
+      color: var(--accent); font-weight: 600;
+    }
+
+    #all-conductors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .cond-full-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex; flex-direction: column; gap: 0.85rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+
+    .cond-full-card.approved { border-left: 3px solid var(--success); }
+    .cond-full-card.pending  { border-left: 3px solid var(--warning); }
+    .cond-full-card.rejected { border-left: 3px solid var(--danger); }
+
+    .cf-head { display: flex; align-items: center; gap: 0.75rem; }
+
+    .cf-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 700; color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .cf-name  { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+    .cf-email { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
+    .cf-status {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.18rem 0.6rem; border-radius: 20px;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      border: 1px solid;
+    }
+
+    .cf-status.approved { background: rgba(22,163,74,0.08);  border-color: rgba(22,163,74,0.2);  color: #16a34a; }
+    .cf-status.pending  { background: rgba(217,119,6,0.08);  border-color: rgba(217,119,6,0.2);  color: var(--warning); }
+    .cf-status.rejected { background: rgba(220,38,38,0.06);  border-color: rgba(220,38,38,0.18); color: var(--danger); }
+
+    .cf-meta { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+    .cf-rating { font-size: 0.78rem; color: var(--muted); }
+    .cf-rating strong { color: #d97706; }
+
+    .cf-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    .cf-doc-btn {
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted); font-family: var(--font);
+      font-size: 0.68rem; font-weight: 500;
+      cursor: pointer; transition: all 0.18s; text-decoration: none;
+      display: inline-flex; align-items: center;
+    }
+
+    .cf-doc-btn.has { color: var(--accent); border-color: rgba(37,99,235,0.2); background: rgba(37,99,235,0.05); }
+    .cf-doc-btn.has:hover { background: rgba(37,99,235,0.1); }
+    .cf-doc-btn.no  { opacity: 0.45; cursor: default; }
 
     /* Users section */
     .users-toolbar {
@@ -332,7 +421,7 @@
 
     .filter-btn {
       padding: 0.3rem 0.75rem;
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 20px;
       color: var(--muted); font-family: var(--font);
@@ -341,24 +430,24 @@
     }
 
     .filter-btn.active {
-      background: rgba(37,99,235,0.12);
-      border-color: rgba(37,99,235,0.35);
-      color: #93c5fd;
+      background: rgba(37,99,235,0.08);
+      border-color: rgba(37,99,235,0.25);
+      color: var(--accent); font-weight: 600;
     }
 
     .search-input {
       margin-left: auto;
       padding: 0.35rem 0.85rem;
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text); font-family: var(--font);
       font-size: 0.8rem; outline: none;
       width: 200px;
-      transition: border-color 0.18s;
+      transition: border-color 0.18s, box-shadow 0.18s;
     }
 
-    .search-input:focus { border-color: rgba(37,99,235,0.4); }
+    .search-input:focus { border-color: rgba(37,99,235,0.35); box-shadow: 0 0 0 3px rgba(37,99,235,0.07); }
     .search-input::placeholder { color: var(--muted); }
 
     .users-table-wrap {
@@ -367,12 +456,10 @@
       border-radius: 12px;
       overflow: hidden;
       overflow-x: auto;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
 
-    table {
-      width: 100%; border-collapse: collapse;
-      font-size: 0.82rem;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 
     thead th {
       padding: 0.75rem 1rem;
@@ -381,21 +468,14 @@
       text-transform: uppercase; letter-spacing: 0.09em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
+      background: var(--surface2);
       white-space: nowrap;
     }
 
     tbody tr { transition: background 0.15s; }
-    tbody tr:hover { background: rgba(255,255,255,0.02); }
-
-    tbody tr:not(:last-child) td {
-      border-bottom: 1px solid var(--border);
-    }
-
-    tbody td {
-      padding: 0.75rem 1rem;
-      color: var(--text);
-      white-space: nowrap;
-    }
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
+    tbody td { padding: 0.75rem 1rem; color: var(--text); white-space: nowrap; }
 
     .td-email { color: var(--muted); font-size: 0.75rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
     .td-id    { color: var(--muted); font-size: 0.72rem; }
@@ -404,24 +484,25 @@
       display: inline-block; padding: 0.18rem 0.55rem;
       border-radius: 20px; font-size: 0.65rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.06em;
+      border: 1px solid;
     }
 
-    .role-pill.estudiante { background: rgba(14,165,233,0.1); border: 1px solid rgba(14,165,233,0.25); color: #38bdf8; }
-    .role-pill.conductor  { background: rgba(129,140,248,0.1); border: 1px solid rgba(129,140,248,0.25); color: #818cf8; }
+    .role-pill.estudiante { background: rgba(14,165,233,0.08); border-color: rgba(14,165,233,0.2); color: #0284c7; }
+    .role-pill.conductor  { background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.2); color: #7c3aed; }
 
     .status-pill {
       display: inline-flex; align-items: center; gap: 0.3rem;
       padding: 0.18rem 0.55rem; border-radius: 20px;
-      font-size: 0.65rem; font-weight: 600;
+      font-size: 0.65rem; font-weight: 600; border: 1px solid;
     }
 
     .status-pill .dot { width: 5px; height: 5px; border-radius: 50%; }
-    .status-pill.ok       { background: rgba(34,197,94,0.1);  color: #4ade80; }
-    .status-pill.ok .dot  { background: #4ade80; }
-    .status-pill.no       { background: rgba(239,68,68,0.08); color: #f87171; }
-    .status-pill.no .dot  { background: #f87171; }
-    .status-pill.pend     { background: rgba(251,191,36,0.1); color: #fbbf24; }
-    .status-pill.pend .dot{ background: #fbbf24; }
+    .status-pill.ok       { background: rgba(22,163,74,0.07);  border-color: rgba(22,163,74,0.18); color: #16a34a; }
+    .status-pill.ok .dot  { background: #16a34a; }
+    .status-pill.no       { background: rgba(220,38,38,0.06);  border-color: rgba(220,38,38,0.16); color: var(--danger); }
+    .status-pill.no .dot  { background: var(--danger); }
+    .status-pill.pend     { background: rgba(217,119,6,0.07);  border-color: rgba(217,119,6,0.18); color: var(--warning); }
+    .status-pill.pend .dot{ background: var(--warning); }
 
     .td-actions { display: flex; gap: 0.35rem; }
 
@@ -433,22 +514,21 @@
     }
 
     .act-btn:hover { opacity: 0.7; }
-
-    .act-btn.verify { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); color: #4ade80; }
-    .act-btn.del    { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2);  color: #f87171; }
-    .act-btn.approv { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.3); color: #818cf8; }
+    .act-btn.verify { background: rgba(22,163,74,0.07);   border-color: rgba(22,163,74,0.2);   color: #16a34a; }
+    .act-btn.del    { background: rgba(220,38,38,0.06);   border-color: rgba(220,38,38,0.18);  color: var(--danger); }
+    .act-btn.approv { background: rgba(124,58,237,0.07);  border-color: rgba(124,58,237,0.2);  color: #7c3aed; }
 
     /* Toast */
     #adm-toast {
       position: fixed; bottom: 1.5rem; left: 50%;
       transform: translateX(-50%) translateY(8px);
-      background: rgba(10,15,28,0.95);
+      background: var(--text);
       color: #f1f5f9; padding: 0.6rem 1.25rem;
       border-radius: 8px; font-size: 0.82rem;
       opacity: 0; transition: opacity 0.25s, transform 0.25s;
       pointer-events: none; white-space: nowrap;
-      border: 1px solid rgba(255,255,255,0.08);
       z-index: 9999;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
     }
 
     #adm-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -456,8 +536,8 @@
     /* Spinner */
     .spin {
       display: inline-block; width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,0.2);
-      border-top-color: #fff; border-radius: 50%;
+      border: 2px solid rgba(37,99,235,0.2);
+      border-top-color: var(--accent); border-radius: 50%;
       animation: rot 0.65s linear infinite; vertical-align: middle;
     }
 
@@ -469,6 +549,68 @@
       display: flex; align-items: center; justify-content: center;
       background: var(--bg); z-index: 500;
     }
+
+    /* ── Map modal ── */
+    #map-modal {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+
+    .map-modal-inner {
+      background: var(--surface);
+      border-radius: 14px;
+      overflow: hidden;
+      width: 100%; max-width: 900px;
+      height: min(80vh, 600px);
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+    }
+
+    .map-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .map-modal-title {
+      font-size: 0.9rem; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    .map-live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #16a34a;
+      animation: blink-dot 1.4s infinite;
+    }
+
+    @keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+    .map-modal-close {
+      background: none; border: none;
+      color: var(--muted); font-size: 1.2rem;
+      cursor: pointer; padding: 0.2rem 0.5rem;
+      border-radius: 6px; transition: background 0.15s, color 0.15s;
+      line-height: 1;
+    }
+
+    .map-modal-close:hover { background: var(--surface2); color: var(--text); }
+
+    #adm-map { flex: 1; }
+
+    .map-legend {
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      font-size: 0.72rem; color: var(--muted);
+      background: var(--surface2);
+    }
+
+    .map-legend span { display: flex; align-items: center; gap: 0.35rem; }
+    .leg-dot { width: 8px; height: 8px; border-radius: 50%; }
   </style>
 </head>
 <body>
@@ -508,37 +650,28 @@
     </div>
     <div class="adm-spacer"></div>
     <span class="adm-user-info" id="adm-user-info"></span>
+    <button class="btn-map" onclick="openMapModal()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
+      </svg>
+      Ver mapa en vivo
+    </button>
     <button class="btn-adm-logout" onclick="admLogout()">Cerrar sesión</button>
   </header>
 
   <div id="loading-overlay">
-    <span class="spin" style="width:28px;height:28px;border-width:3px;border-top-color:#2563eb;border-color:rgba(37,99,235,0.2)"></span>
+    <span class="spin" style="width:28px;height:28px;border-width:3px"></span>
   </div>
 
   <main class="adm-main" id="adm-main" style="display:none">
 
     <!-- Stats -->
-    <div class="stats-row" id="stats-row">
-      <div class="stat-card c-total">
-        <div class="stat-num" id="s-total">—</div>
-        <div class="stat-lbl">Usuarios totales</div>
-      </div>
-      <div class="stat-card c-stud">
-        <div class="stat-num" id="s-stud">—</div>
-        <div class="stat-lbl">Estudiantes</div>
-      </div>
-      <div class="stat-card c-cond">
-        <div class="stat-num" id="s-cond">—</div>
-        <div class="stat-lbl">Conductores</div>
-      </div>
-      <div class="stat-card c-pend">
-        <div class="stat-num" id="s-pend">—</div>
-        <div class="stat-lbl">Pend. verificación</div>
-      </div>
-      <div class="stat-card c-active">
-        <div class="stat-num" id="s-verified">—</div>
-        <div class="stat-lbl">Sin verificar email</div>
-      </div>
+    <div class="stats-row">
+      <div class="stat-card c-total"><div class="stat-num" id="s-total">—</div><div class="stat-lbl">Usuarios totales</div></div>
+      <div class="stat-card c-stud"><div class="stat-num" id="s-stud">—</div><div class="stat-lbl">Estudiantes</div></div>
+      <div class="stat-card c-cond"><div class="stat-num" id="s-cond">—</div><div class="stat-lbl">Conductores</div></div>
+      <div class="stat-card c-pend"><div class="stat-num" id="s-pend">—</div><div class="stat-lbl">Pend. verificación</div></div>
+      <div class="stat-card c-active"><div class="stat-num" id="s-verified">—</div><div class="stat-lbl">Sin verificar email</div></div>
     </div>
 
     <!-- Pending conductors -->
@@ -547,6 +680,19 @@
       <span class="section-badge" id="pend-badge">0</span>
     </div>
     <div id="pending-grid"></div>
+
+    <!-- All conductors -->
+    <div class="section-head" style="margin-top:0.5rem">
+      <span class="section-title">Todos los conductores</span>
+      <span class="section-badge" id="cond-total-badge" style="background:rgba(37,99,235,0.08);border-color:rgba(37,99,235,0.2);color:var(--accent)">0</span>
+    </div>
+    <div id="cond-filter-tabs">
+      <button class="cond-filter-btn active" onclick="setConductorFilter('all', this)">Todos</button>
+      <button class="cond-filter-btn" onclick="setConductorFilter('approved', this)">Aprobados</button>
+      <button class="cond-filter-btn" onclick="setConductorFilter('pending', this)">Pendientes</button>
+      <button class="cond-filter-btn" onclick="setConductorFilter('rejected', this)">Rechazados</button>
+    </div>
+    <div id="all-conductors-grid"></div>
 
     <!-- Users table -->
     <div class="section-head" style="margin-top:0.5rem">
@@ -566,14 +712,8 @@
       <table>
         <thead>
           <tr>
-            <th>#</th>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Rol</th>
-            <th>Email verif.</th>
-            <th>Estado cond.</th>
-            <th>Calificación</th>
-            <th>Acciones</th>
+            <th>#</th><th>Nombre</th><th>Email</th><th>Rol</th>
+            <th>Email verif.</th><th>Estado cond.</th><th>Calificación</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody id="users-tbody"></tbody>
@@ -582,33 +722,55 @@
   </main>
 </div>
 
+<!-- Map modal -->
+<div id="map-modal" class="hidden" onclick="closeMapIfOverlay(event)">
+  <div class="map-modal-inner">
+    <div class="map-modal-header">
+      <div class="map-modal-title">
+        <div class="map-live-dot"></div>
+        Mapa en tiempo real
+      </div>
+      <button class="map-modal-close" onclick="closeMapModal()">✕</button>
+    </div>
+    <div id="adm-map"></div>
+    <div class="map-legend">
+      <span><span class="leg-dot" style="background:#22c55e"></span>Conductor disponible</span>
+      <span><span class="leg-dot" style="background:#ef4444"></span>Conductor lleno</span>
+      <span><span class="leg-dot" style="background:#fbbf24"></span>En camino</span>
+      <span><span class="leg-dot" style="background:#0ea5e9"></span>Estudiante</span>
+    </div>
+  </div>
+</div>
+
 <div id="adm-toast"></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   let _creds = null;
   let _allUsers = [];
+  let _allConductors = [];
   let _currentFilter = 'all';
+  let _conductorFilter = 'all';
 
+  // ── Auth ──────────────────────────────────────────────────────────────────
   async function tryLogin(e) {
     e.preventDefault();
-    const u    = document.getElementById('adm-user').value.trim();
-    const p    = document.getElementById('adm-pass').value;
-    const btn  = document.getElementById('login-btn');
-    const err  = document.getElementById('login-err');
+    const u   = document.getElementById('adm-user').value.trim();
+    const p   = document.getElementById('adm-pass').value;
+    const btn = document.getElementById('login-btn');
+    const err = document.getElementById('login-err');
     err.classList.add('hidden');
     btn.innerHTML = '<span class="spin"></span>';
     btn.disabled = true;
 
     const creds = btoa(`${u}:${p}`);
     try {
-      const res = await fetch('/admin/users', {
-        headers: { 'Authorization': `Basic ${creds}` },
-      });
-      if (!res.ok) throw new Error('Credenciales incorrectas');
+      const res = await fetch('/admin/users', { headers: { 'Authorization': `Basic ${creds}` } });
+      if (!res.ok) throw new Error();
       _creds = creds;
       sessionStorage.setItem('adm_creds', creds);
       sessionStorage.setItem('adm_user', u);
-      document.getElementById('adm-user-info').textContent = `👤 ${u}`;
+      document.getElementById('adm-user-info').textContent = u;
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
       loadDashboard();
@@ -621,7 +783,7 @@
   }
 
   function admLogout() {
-    _creds = null; _allUsers = [];
+    _creds = null; _allUsers = []; _allConductors = [];
     sessionStorage.removeItem('adm_creds');
     sessionStorage.removeItem('adm_user');
     document.getElementById('dashboard').classList.add('hidden');
@@ -637,18 +799,22 @@
     });
   }
 
+  // ── Dashboard ─────────────────────────────────────────────────────────────
   async function loadDashboard() {
     document.getElementById('loading-overlay').style.display = 'flex';
     document.getElementById('adm-main').style.display = 'none';
     try {
-      const [usersRes, pendRes] = await Promise.all([
+      const [usersRes, pendRes, condsRes] = await Promise.all([
         fetchA('/admin/users'),
         fetchA('/admin/conductors/pending'),
+        fetchA('/admin/conductors'),
       ]);
-      _allUsers = await usersRes.json();
-      const pending = await pendRes.json();
+      _allUsers      = await usersRes.json();
+      const pending  = await pendRes.json();
+      _allConductors = await condsRes.json();
       renderStats(_allUsers, pending);
       renderPending(pending);
+      renderAllConductors();
       renderTable();
     } catch {
       toast('Error al cargar datos');
@@ -659,53 +825,127 @@
   }
 
   function renderStats(users, pending) {
-    const total    = users.length;
-    const students = users.filter(u => u.role === 'estudiante').length;
-    const conds    = users.filter(u => u.role === 'conductor').length;
-    const noEmail  = users.filter(u => !u.is_verified).length;
-    document.getElementById('s-total').textContent    = total;
-    document.getElementById('s-stud').textContent     = students;
-    document.getElementById('s-cond').textContent     = conds;
+    document.getElementById('s-total').textContent    = users.length;
+    document.getElementById('s-stud').textContent     = users.filter(u => u.role === 'estudiante').length;
+    document.getElementById('s-cond').textContent     = users.filter(u => u.role === 'conductor').length;
     document.getElementById('s-pend').textContent     = pending.length;
-    document.getElementById('s-verified').textContent = noEmail;
+    document.getElementById('s-verified').textContent = users.filter(u => !u.is_verified).length;
     document.getElementById('pend-badge').textContent = pending.length;
   }
 
+  // ── Pending conductors ────────────────────────────────────────────────────
   function renderPending(pending) {
     const grid = document.getElementById('pending-grid');
     if (!pending.length) {
-      grid.innerHTML = '<div class="no-pending">No hay conductores pendientes de verificación.</div>';
+      grid.innerHTML = '<div class="no-pending">Sin conductores pendientes de verificación.</div>';
       return;
     }
     grid.innerHTML = pending.map(c => {
       const initials = c.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
       const docs = [
-        { key: 'has_cedula', label: 'Cédula' },
-        { key: 'has_selfie', label: 'Selfie' },
-        { key: 'has_plate',  label: 'Placa'  },
-        { key: 'has_soat',   label: 'SOAT'   },
+        { key: 'has_cedula', label: 'Cédula' }, { key: 'has_selfie', label: 'Selfie' },
+        { key: 'has_plate',  label: 'Placa'  }, { key: 'has_soat',   label: 'SOAT'   },
       ];
       const docsHtml = docs.map(d =>
         `<span class="doc-chip ${c[d.key] ? 'ok' : 'missing'}">${c[d.key] ? '✓' : '✗'} ${d.label}</span>`
       ).join('');
-      return `
-        <div class="cond-card" id="ccard-${c.id}">
-          <div class="cond-card-head">
-            <div class="cond-mini-avatar">${initials}</div>
-            <div>
-              <div class="cond-card-name">${esc(c.name)}</div>
-              <div class="cond-card-email">${esc(c.email)}</div>
-            </div>
-          </div>
-          <div class="docs-row">${docsHtml}</div>
-          <div class="cond-actions">
-            <button class="btn-approve" onclick="approveConductor(${c.id})">✓ Aprobar</button>
-            <button class="btn-reject-c" onclick="rejectConductor(${c.id})">✗ Rechazar</button>
-          </div>
-        </div>`;
+      return `<div class="cond-card" id="ccard-${c.id}">
+        <div class="cond-card-head">
+          <div class="cond-mini-avatar">${initials}</div>
+          <div><div class="cond-card-name">${esc(c.name)}</div><div class="cond-card-email">${esc(c.email)}</div></div>
+        </div>
+        <div class="docs-row">${docsHtml}</div>
+        <div class="cond-actions">
+          <button class="btn-approve" onclick="approveConductor(${c.id})">✓ Aprobar</button>
+          <button class="btn-reject-c" onclick="rejectConductor(${c.id})">✗ Rechazar</button>
+        </div>
+      </div>`;
     }).join('');
   }
 
+  // ── All conductors section ────────────────────────────────────────────────
+  function setConductorFilter(f, btn) {
+    _conductorFilter = f;
+    document.querySelectorAll('.cond-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAllConductors();
+  }
+
+  function renderAllConductors() {
+    const grid = document.getElementById('all-conductors-grid');
+    document.getElementById('cond-total-badge').textContent = _allConductors.length;
+
+    const filtered = _conductorFilter === 'all'
+      ? _allConductors
+      : _allConductors.filter(c => c.conductor_status === _conductorFilter);
+
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="no-pending">Sin conductores en esta categoría.</div>';
+      return;
+    }
+
+    const docTypes = [
+      { key: 'has_cedula', label: 'Cédula',  type: 'cedula'  },
+      { key: 'has_selfie', label: 'Selfie',  type: 'selfie'  },
+      { key: 'has_plate',  label: 'Placa',   type: 'plate'   },
+      { key: 'has_soat',   label: 'SOAT',    type: 'soat'    },
+    ];
+
+    grid.innerHTML = filtered.map(c => {
+      const initials = c.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const statusMap = {
+        approved: 'Aprobado', pending: 'Pendiente', rejected: 'Rechazado',
+      };
+      const statusLabel = statusMap[c.conductor_status] || c.conductor_status;
+      const ratingHtml  = c.rating_avg != null
+        ? `<span class="cf-rating"><strong>★ ${c.rating_avg}</strong> (${c.rating_count} calif.)</span>`
+        : `<span class="cf-rating" style="opacity:0.5">Sin calificaciones</span>`;
+
+      const docsHtml = docTypes.map(d =>
+        c[d.key]
+          ? `<button class="cf-doc-btn has" onclick="viewDoc(${c.id}, '${d.type}', this)">${d.label}</button>`
+          : `<span class="cf-doc-btn no">${d.label} —</span>`
+      ).join('');
+
+      const actionHtml = c.conductor_status === 'pending'
+        ? `<div style="display:flex;gap:0.4rem;margin-top:0.25rem">
+            <button class="btn-approve" style="flex:1;padding:0.35rem" onclick="approveConductor(${c.id})">✓ Aprobar</button>
+            <button class="btn-reject-c" style="flex:1;padding:0.35rem" onclick="rejectConductor(${c.id})">✗ Rechazar</button>
+           </div>`
+        : '';
+
+      return `<div class="cond-full-card ${c.conductor_status || 'pending'}" id="cfcard-${c.id}">
+        <div class="cf-head">
+          <div class="cf-avatar">${initials}</div>
+          <div style="min-width:0">
+            <div class="cf-name">${esc(c.name)}</div>
+            <div class="cf-email">${esc(c.email)}</div>
+          </div>
+          <span class="cf-status ${c.conductor_status || 'pending'}" style="margin-left:auto;flex-shrink:0">${statusLabel}</span>
+        </div>
+        <div class="cf-meta">${ratingHtml}</div>
+        <div class="cf-actions">${docsHtml}</div>
+        ${actionHtml}
+      </div>`;
+    }).join('');
+  }
+
+  async function viewDoc(userId, docType, btn) {
+    const orig = btn.textContent;
+    btn.textContent = '…';
+    try {
+      const res = await fetchA(`/admin/conductors/${userId}/doc/${docType}`);
+      if (!res.ok) { toast('Documento no disponible'); btn.textContent = orig; return; }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch {
+      toast('Error al abrir documento');
+    }
+    btn.textContent = orig;
+  }
+
+  // ── Users table ───────────────────────────────────────────────────────────
   function setFilter(f, btn) {
     _currentFilter = f;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -728,29 +968,21 @@
     }
 
     tbody.innerHTML = rows.map(u => {
-      const rolePill    = `<span class="role-pill ${u.role}">${u.role}</span>`;
-      const emailVerif  = u.is_verified
+      const rolePill   = `<span class="role-pill ${u.role}">${u.role}</span>`;
+      const emailVerif = u.is_verified
         ? '<span class="status-pill ok"><span class="dot"></span>Verificado</span>'
         : '<span class="status-pill no"><span class="dot"></span>Sin verificar</span>';
-      const condStatus  = u.role === 'conductor'
-        ? (u.conductor_status === 'approved'
-            ? '<span class="status-pill ok"><span class="dot"></span>Aprobado</span>'
-            : u.conductor_status === 'pending'
-              ? '<span class="status-pill pend"><span class="dot"></span>Pendiente</span>'
-              : u.conductor_status === 'rejected'
-                ? '<span class="status-pill no"><span class="dot"></span>Rechazado</span>'
-                : '—')
+      const condStatus = u.role === 'conductor'
+        ? (u.conductor_status === 'approved' ? '<span class="status-pill ok"><span class="dot"></span>Aprobado</span>'
+          : u.conductor_status === 'pending'  ? '<span class="status-pill pend"><span class="dot"></span>Pendiente</span>'
+          : u.conductor_status === 'rejected' ? '<span class="status-pill no"><span class="dot"></span>Rechazado</span>'
+          : '—')
         : '—';
       const rating = u.rating_avg != null ? `★ ${u.rating_avg}` : '—';
-
-      const verifyBtn = !u.is_verified
-        ? `<button class="act-btn verify" onclick="verifyUser('${esc(u.email)}')">Verificar email</button>`
-        : '';
-      const approveCondBtn = u.role === 'conductor' && u.conductor_status === 'pending'
-        ? `<button class="act-btn approv" onclick="approveConductorByEmail('${esc(u.email)}', ${u.id})">Aprobar cond.</button>`
-        : '';
+      const verifyBtn  = !u.is_verified ? `<button class="act-btn verify" onclick="verifyUser('${esc(u.email)}')">Verificar</button>` : '';
+      const approveBtn = u.role === 'conductor' && u.conductor_status === 'pending'
+        ? `<button class="act-btn approv" onclick="approveConductorByEmail('${esc(u.email)}', ${u.id})">Aprobar</button>` : '';
       const delBtn = `<button class="act-btn del" onclick="deleteUser('${esc(u.email)}')">Eliminar</button>`;
-
       return `<tr>
         <td class="td-id">${u.id}</td>
         <td><strong>${esc(u.name)}</strong></td>
@@ -759,58 +991,113 @@
         <td>${emailVerif}</td>
         <td>${condStatus}</td>
         <td style="color:var(--muted)">${rating}</td>
-        <td><div class="td-actions">${verifyBtn}${approveCondBtn}${delBtn}</div></td>
+        <td><div class="td-actions">${verifyBtn}${approveBtn}${delBtn}</div></td>
       </tr>`;
     }).join('');
   }
 
+  // ── Conductor actions ─────────────────────────────────────────────────────
   async function approveConductor(id) {
     const res = await fetchA(`/admin/conductors/${id}/approve`, { method: 'POST' });
-    if (res.ok) {
-      toast('Conductor aprobado');
-      document.getElementById(`ccard-${id}`)?.remove();
-      await loadDashboard();
-    } else {
-      toast('Error al aprobar');
-    }
+    if (res.ok) { toast('Conductor aprobado'); await loadDashboard(); }
+    else toast('Error al aprobar');
   }
 
   async function rejectConductor(id) {
     if (!confirm('¿Rechazar la verificación de este conductor?')) return;
     const res = await fetchA(`/admin/conductors/${id}/reject`, { method: 'POST' });
-    if (res.ok) {
-      toast('Conductor rechazado');
-      await loadDashboard();
-    } else {
-      toast('Error al rechazar');
-    }
+    if (res.ok) { toast('Conductor rechazado'); await loadDashboard(); }
+    else toast('Error al rechazar');
   }
 
-  async function approveConductorByEmail(email, id) {
-    await approveConductor(id);
-  }
+  async function approveConductorByEmail(email, id) { await approveConductor(id); }
 
   async function verifyUser(email) {
     const res = await fetchA(`/admin/users/${encodeURIComponent(email)}/verify`, { method: 'POST' });
-    if (res.ok) {
-      toast('Email verificado');
-      await loadDashboard();
-    } else {
-      toast('Error al verificar');
-    }
+    if (res.ok) { toast('Email verificado'); await loadDashboard(); }
+    else toast('Error al verificar');
   }
 
   async function deleteUser(email) {
     if (!confirm(`¿Eliminar la cuenta de ${email}? Esta acción es permanente.`)) return;
     const res = await fetchA(`/admin/users/${encodeURIComponent(email)}`, { method: 'DELETE' });
-    if (res.ok) {
-      toast('Usuario eliminado');
-      await loadDashboard();
-    } else {
-      toast('Error al eliminar');
-    }
+    if (res.ok) { toast('Usuario eliminado'); await loadDashboard(); }
+    else toast('Error al eliminar');
   }
 
+  // ── Map modal ─────────────────────────────────────────────────────────────
+  let _admMap = null;
+  let _admMarkers = {};
+  let _mapRefreshTimer = null;
+
+  function openMapModal() {
+    document.getElementById('map-modal').classList.remove('hidden');
+    if (!_admMap) {
+      _admMap = L.map('adm-map', { zoomControl: true }).setView([11.5392, -72.9066], 14);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19,
+      }).addTo(_admMap);
+    }
+    refreshAdmMap();
+    _mapRefreshTimer = setInterval(refreshAdmMap, 5000);
+    setTimeout(() => _admMap.invalidateSize(), 100);
+  }
+
+  function closeMapModal() {
+    document.getElementById('map-modal').classList.add('hidden');
+    clearInterval(_mapRefreshTimer);
+  }
+
+  function closeMapIfOverlay(e) {
+    if (e.target === e.currentTarget) closeMapModal();
+  }
+
+  async function refreshAdmMap() {
+    try {
+      const data = await fetch('/usuarios/activos').then(r => r.json());
+      const users = data.usuarios || [];
+      const activeIds = new Set(users.map(u => u.id));
+
+      Object.keys(_admMarkers).forEach(id => {
+        if (!activeIds.has(id)) { _admMarkers[id].remove(); delete _admMarkers[id]; }
+      });
+
+      users.forEach(u => {
+        if (!u.lat || !u.lng) return;
+        const icon  = buildAdmIcon(u);
+        const popup = `<div style="font-family:'Outfit',sans-serif;font-size:0.82rem;line-height:1.5">
+          <strong>${esc(u.name)}</strong><br>
+          ${u.role === 'conductor' ? `Estado: ${u.status || '—'}<br>${u.onboard_count || 0} pasajeros` : 'Estudiante'}
+        </div>`;
+        if (_admMarkers[u.id]) {
+          _admMarkers[u.id].setLatLng([u.lat, u.lng]).setIcon(icon);
+        } else {
+          _admMarkers[u.id] = L.marker([u.lat, u.lng], { icon }).addTo(_admMap).bindPopup(popup);
+        }
+      });
+    } catch (_) {}
+  }
+
+  function buildAdmIcon(u) {
+    if (u.role === 'conductor') {
+      const color = u.status === 'lleno' ? '#ef4444' : u.status === 'en camino' ? '#fbbf24' : '#22c55e';
+      return L.divIcon({
+        className: '',
+        html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="${color}">
+            <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+          </svg></div>`,
+        iconSize: [32, 32], iconAnchor: [16, 16],
+      });
+    }
+    return L.divIcon({
+      className: '',
+      html: `<div style="background:#0ea5e9;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
+      iconSize: [16, 16], iconAnchor: [8, 8],
+    });
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
   function toast(msg) {
     const el = document.getElementById('adm-toast');
     el.textContent = msg;
@@ -829,7 +1116,7 @@
     const user  = sessionStorage.getItem('adm_user');
     if (saved) {
       _creds = saved;
-      document.getElementById('adm-user-info').textContent = `👤 ${user || 'admin'}`;
+      document.getElementById('adm-user-info').textContent = user || 'admin';
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
       loadDashboard();
