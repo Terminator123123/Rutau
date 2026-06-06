@@ -40,6 +40,7 @@ function readSessionCookie() {
 window.addEventListener("DOMContentLoaded", () => {
   initMap();
   startBgPoll();
+  setupFormValidation();
   const params = new URLSearchParams(location.search);
   if (params.get("verified") === "1") showVerifiedBanner();
   const saved = readSessionCookie();
@@ -52,6 +53,35 @@ window.addEventListener("DOMContentLoaded", () => {
       .finally(() => startMap());
   }
 });
+
+// ── Real-time form validation ──────────────────────────────────────────────
+
+function setupFormValidation() {
+  const validators = {
+    "login-email":    v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    "login-password": v => v.length >= 6,
+    "reg-name":       v => v.trim().length >= 2,
+    "reg-email":      v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    "reg-password":   v => v.length >= 6,
+    "edit-name":      v => v.trim().length === 0 || v.trim().length >= 2,
+    "edit-password":  v => v.length === 0 || v.length >= 6,
+  };
+
+  Object.entries(validators).forEach(([id, test]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("blur", () => {
+      if (!el.value) { el.classList.remove("valid", "invalid"); return; }
+      el.classList.toggle("valid",   test(el.value));
+      el.classList.toggle("invalid", !test(el.value));
+    });
+    el.addEventListener("input", () => {
+      if (el.classList.contains("invalid") && test(el.value)) {
+        el.classList.replace("invalid", "valid");
+      }
+    });
+  });
+}
 
 function showVerifiedBanner() {
   const msg = document.getElementById("login-error");
@@ -270,6 +300,7 @@ function startMap() {
       document.getElementById("btn-status").classList.remove("hidden");
       document.getElementById("passenger-counter").classList.remove("hidden");
       document.getElementById("passengers-panel").classList.remove("hidden");
+      refreshPassengersEmpty();
       updateStatusButton();
       updateCounterDisplay(0);
     } else {
@@ -371,7 +402,8 @@ function connectWS(lat, lng) {
   ws.onopen    = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
   ws.onmessage = e  => handleMessage(JSON.parse(e.data));
   ws.onclose   = e  => {
-    if (e.code === 4001 || e.code === 4003) { logout(); return; }
+    if (e.code === 4001) { showToast("Sesión expirada. Vuelve a iniciar sesión."); logout(); return; }
+    if (e.code === 4003) { showToast("Cuenta no verificada."); logout(); return; }
     setStatus("connecting", "Reconectando...");
   };
   ws.onerror = () => setStatus("error", "Error de conexion");
@@ -544,8 +576,37 @@ function showRequestModal(msg) {
 
 function acceptRequest() {
   if (!_pendingRequestId) return;
+  const studentName = document.getElementById("request-student-name").textContent;
   sendWS({ type: "trip_accept", request_id: _pendingRequestId });
+  addPassengerToPanel(_pendingRequestId, studentName);
   closeRequestModal();
+}
+
+function addPassengerToPanel(tripId, name) {
+  const list = document.getElementById("passengers-list");
+  const empty = list.querySelector(".passengers-empty");
+  if (empty) empty.remove();
+
+  const item = document.createElement("div");
+  item.className = "passenger-item";
+  item.id = `passenger-${tripId}`;
+  item.innerHTML = `
+    <div class="passenger-name">${name}</div>
+    <div class="passenger-btns">
+      <button class="btn-paction onboard" onclick="markOnboard(${tripId})">A bordo</button>
+      <button class="btn-paction dropoff" onclick="markDropoff(${tripId}, 0)">Dejó</button>
+    </div>`;
+  list.appendChild(item);
+}
+
+function refreshPassengersEmpty() {
+  const list = document.getElementById("passengers-list");
+  if (!list) return;
+  if (!list.querySelector(".passenger-item")) {
+    if (!list.querySelector(".passengers-empty")) {
+      list.innerHTML = '<div class="passengers-empty">Sin pasajeros a bordo</div>';
+    }
+  }
 }
 
 function rejectRequest() {
@@ -568,6 +629,7 @@ function markDropoff(tripId, studentDbId) {
   sendWS({ type: "passenger_dropoff", trip_id: tripId, student_db_id: studentDbId });
   const item = document.getElementById(`passenger-${tripId}`);
   if (item) item.remove();
+  refreshPassengersEmpty();
 }
 
 function sendQuickMsg(tripId, key) {
