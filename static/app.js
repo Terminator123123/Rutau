@@ -299,7 +299,6 @@ function startMap() {
   setTimeout(() => {
     authScreen.classList.add("hidden");
     document.getElementById("topbar").classList.remove("hidden");
-    document.getElementById("legend").classList.remove("hidden");
     map.invalidateSize();
     requestLocation();
   }, 580);
@@ -312,7 +311,6 @@ async function logout() {
   cleanup();
 
   document.getElementById("topbar").classList.add("hidden");
-  document.getElementById("legend").classList.add("hidden");
   document.getElementById("btn-status").classList.add("hidden");
   document.getElementById("passenger-counter").classList.add("hidden");
   document.getElementById("passengers-panel").classList.add("hidden");
@@ -677,15 +675,26 @@ function markerColor(user) {
 }
 
 function buildIcon(user, isMe) {
-  const color  = markerColor(user);
-  const size   = isMe ? 26 : 18;
-  const radius = user.role === "estudiante" ? "50%" : "4px";
-  const ring   = isMe
+  if (user.role === "conductor") {
+    const size = isMe ? 44 : 32;
+    const statusColor = markerColor(user);
+    return L.divIcon({
+      className: "",
+      html: `<div style="position:relative;width:${size}px;height:${size}px">
+        <img src="/static/carrito.png" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"/>
+        <span style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:${statusColor};border:2px solid #fff;display:block"></span>
+      </div>`,
+      iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+    });
+  }
+  const color = markerColor(user);
+  const size  = isMe ? 26 : 18;
+  const ring  = isMe
     ? "box-shadow:0 0 0 4px rgba(255,255,255,0.2),0 2px 8px rgba(0,0,0,0.5);"
     : "box-shadow:0 2px 6px rgba(0,0,0,0.4);";
   return L.divIcon({
     className: "",
-    html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:${radius};border:3px solid #fff;${ring}"></div>`,
+    html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:3px solid #fff;${ring}"></div>`,
     iconSize: [size, size], iconAnchor: [size / 2, size / 2],
   });
 }
