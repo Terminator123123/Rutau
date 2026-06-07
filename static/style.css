@@ -509,8 +509,10 @@ html, body {
 /* ── Zone select ──────────────────────────────────────────────────────────── */
 #zone-select {
   padding: 0.28rem 0.6rem;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(7, 11, 18, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
   color: #f1f5f9;
   font-family: var(--font);
