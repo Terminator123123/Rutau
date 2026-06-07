@@ -297,7 +297,7 @@ function startMap() {
 
   if (currentUser.role === "conductor") {
     if (isApproved) {
-      document.getElementById("btn-status").classList.remove("hidden");
+      document.getElementById("conductor-controls").classList.remove("hidden");
       document.getElementById("passenger-counter").classList.remove("hidden");
       document.getElementById("passengers-panel").classList.remove("hidden");
       refreshPassengersEmpty();
@@ -342,13 +342,12 @@ async function logout() {
   cleanup();
 
   document.getElementById("topbar").classList.add("hidden");
-  document.getElementById("btn-status").classList.add("hidden");
+  document.getElementById("conductor-controls").classList.add("hidden");
   document.getElementById("passenger-counter").classList.add("hidden");
   document.getElementById("passengers-panel").classList.add("hidden");
   document.getElementById("student-actions").classList.add("hidden");
   document.getElementById("waiting-overlay").classList.add("hidden");
   document.getElementById("conductor-approaching").classList.add("hidden");
-  document.getElementById("zone-select").classList.add("hidden");
   document.getElementById("pending-banner").classList.add("hidden");
 
   const authScreen = document.getElementById("auth-screen");
@@ -646,9 +645,6 @@ function populateZoneSelect(zones) {
     opt.value = z; opt.textContent = z;
     sel.appendChild(opt);
   });
-  if (currentUser?.role === "conductor" && currentUser?.conductor_status === "approved") {
-    sel.classList.remove("hidden");
-  }
 }
 
 function setZone(zone) {

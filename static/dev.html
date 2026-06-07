@@ -26,12 +26,7 @@
           <div id="tb-stars" class="tb-stars-row"></div>
         </div>
       </div>
-      <div class="tb-center">
-        <button id="btn-status" class="hidden" onclick="cycleStatus()"></button>
-        <select id="zone-select" class="hidden" onchange="setZone(this.value)">
-          <option value="">Destino</option>
-        </select>
-      </div>
+      <div class="tb-center"></div>
       <div id="topbar-right">
         <span id="status-dot" class="dot connecting"></span>
         <span id="status-text">Conectando...</span>
@@ -86,6 +81,14 @@
     <div id="passengers-panel" class="hidden">
       <div class="passengers-header">Pasajeros a bordo</div>
       <div id="passengers-list"></div>
+    </div>
+
+    <!-- Controles conductor: estado + destino (arriba del contador) -->
+    <div id="conductor-controls" class="hidden">
+      <button id="btn-status" onclick="cycleStatus()"></button>
+      <select id="zone-select" onchange="setZone(this.value)">
+        <option value="">Destino</option>
+      </select>
     </div>
 
     <!-- Contador de pasajeros manuales (conductor) -->
