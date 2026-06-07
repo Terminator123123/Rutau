@@ -64,8 +64,7 @@ function setupFormValidation() {
     "reg-name":       v => v.trim().length >= 2,
     "reg-email":      v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
     "reg-password":   v => v.length >= 6,
-    "edit-name":      v => v.trim().length === 0 || v.trim().length >= 2,
-    "edit-password":  v => v.length === 0 || v.length >= 6,
+    "edit-name":      v => v.trim().length >= 2,
   };
 
   Object.entries(validators).forEach(([id, test]) => {
@@ -1031,7 +1030,7 @@ function setLoading(btn, loading) {
 function openDrawer() {
   if (!currentUser) return;
 
-  document.getElementById("dr-name").textContent      = currentUser.name;
+  document.getElementById("dr-name-text").textContent  = currentUser.name;
   document.getElementById("dr-role-badge").textContent =
     currentUser.role === "conductor" ? "Conductor" : "Estudiante";
   document.getElementById("dr-stars").innerHTML = renderStarRow(
@@ -1125,7 +1124,6 @@ function cleanup() {
 
 function openEditModal() {
   document.getElementById("edit-name").value = currentUser.name || "";
-  document.getElementById("edit-password").value = "";
   document.getElementById("edit-msg").classList.add("hidden");
   document.getElementById("edit-modal").classList.remove("hidden");
 }
@@ -1136,14 +1134,10 @@ function closeEditModal() {
 
 async function saveProfile(e) {
   e.preventDefault();
-  const name     = document.getElementById("edit-name").value.trim();
-  const password = document.getElementById("edit-password").value;
-  const msg      = document.getElementById("edit-msg");
-  const body     = {};
-  if (name && name !== currentUser.name) body.name = name;
-  if (password) body.password = password;
-  if (!Object.keys(body).length) {
-    msg.textContent = "No hay cambios.";
+  const name = document.getElementById("edit-name").value.trim();
+  const msg  = document.getElementById("edit-msg");
+  if (!name || name === currentUser.name) {
+    msg.textContent = "Ingresa un nombre diferente.";
     msg.style.color = "#94a3b8";
     msg.classList.remove("hidden");
     return;
@@ -1152,17 +1146,60 @@ async function saveProfile(e) {
     method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ name }),
   });
   if (r.ok) {
     const updated = await r.json();
     currentUser = updated;
-    document.getElementById("tb-name").textContent = updated.name;
-    document.getElementById("dr-name").textContent = updated.name;
+    document.getElementById("tb-name").textContent      = updated.name;
+    document.getElementById("dr-name-text").textContent = updated.name;
     msg.textContent = "¡Guardado!";
     msg.style.color = "#22c55e";
     msg.classList.remove("hidden");
     setTimeout(() => closeEditModal(), 1200);
+  } else {
+    const err = await r.json().catch(() => ({}));
+    msg.textContent = err.detail || "Error al guardar.";
+    msg.style.color = "#ef4444";
+    msg.classList.remove("hidden");
+  }
+}
+
+function openPasswordModal() {
+  document.getElementById("pw-old").value = "";
+  document.getElementById("pw-new").value = "";
+  document.getElementById("pw-confirm").value = "";
+  document.getElementById("pw-msg").classList.add("hidden");
+  document.getElementById("change-password-modal").classList.remove("hidden");
+}
+
+function closePasswordModal() {
+  document.getElementById("change-password-modal").classList.add("hidden");
+}
+
+async function savePassword(e) {
+  e.preventDefault();
+  const oldPw   = document.getElementById("pw-old").value;
+  const newPw   = document.getElementById("pw-new").value;
+  const confirm = document.getElementById("pw-confirm").value;
+  const msg     = document.getElementById("pw-msg");
+  if (newPw !== confirm) {
+    msg.textContent = "Las contraseñas nuevas no coinciden.";
+    msg.style.color = "#ef4444";
+    msg.classList.remove("hidden");
+    return;
+  }
+  const r = await fetch("/me", {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: newPw, old_password: oldPw }),
+  });
+  if (r.ok) {
+    msg.textContent = "¡Contraseña actualizada!";
+    msg.style.color = "#22c55e";
+    msg.classList.remove("hidden");
+    setTimeout(() => closePasswordModal(), 1400);
   } else {
     const err = await r.json().catch(() => ({}));
     msg.textContent = err.detail || "Error al guardar.";

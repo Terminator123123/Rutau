@@ -752,8 +752,12 @@
       <input type="number" id="recarga-monto" placeholder="ej: 5000" min="1" step="100" />
     </div>
     <div class="field">
-      <label>Notas (opcional)</label>
-      <input type="text" id="recarga-notas" placeholder="Pago en efectivo, transferencia…" maxlength="100" />
+      <label>Método de pago</label>
+      <select id="recarga-notas" style="width:100%;padding:0.75rem 0.9rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none">
+        <option value="">Sin especificar</option>
+        <option value="Efectivo">Efectivo</option>
+        <option value="Transferencia">Transferencia</option>
+      </select>
     </div>
     <div id="recarga-msg" class="hidden" style="background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.2);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.78rem;color:var(--danger);margin-bottom:0.75rem"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
@@ -1166,7 +1170,7 @@
     _recargaTargetId = id;
     document.getElementById('recarga-conductor-name').textContent = name;
     document.getElementById('recarga-monto').value = '';
-    document.getElementById('recarga-notas').value = '';
+    document.getElementById('recarga-notas').selectedIndex = 0;
     document.getElementById('recarga-msg').classList.add('hidden');
     document.getElementById('recarga-modal').classList.remove('hidden');
   }
@@ -1193,8 +1197,10 @@
         method: 'POST',
         body: JSON.stringify({ monto, notas }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Error');
+      const text = await res.text();
+      let data = {};
+      try { data = JSON.parse(text); } catch (_) {}
+      if (!res.ok) throw new Error(data.detail || `Error del servidor (${res.status})`);
       toast(`Recarga de $${monto.toLocaleString('es-CO')} registrada`);
       closeRecargaModal();
       await loadDashboard();

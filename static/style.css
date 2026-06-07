@@ -1111,11 +1111,30 @@ html, body {
 }
 
 .dr-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 1.15rem;
   font-weight: 700;
   color: #f1f5f9;
   letter-spacing: 0.03em;
 }
+
+.dr-pencil-btn {
+  background: none;
+  border: none;
+  color: rgba(241,245,249,0.45);
+  cursor: pointer;
+  padding: 0.15rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  transition: color 0.18s;
+  flex-shrink: 0;
+}
+
+.dr-pencil-btn:hover { color: #f1f5f9; }
 
 .dr-role-badge {
   display: inline-block;

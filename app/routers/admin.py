@@ -144,7 +144,7 @@ def admin_registrar_recarga(
 
     recarga = Recarga(
         conductor_id=user_id,
-        admin_id=admin.id,
+        admin_id=0,
         monto=body.monto,
         registrada_en=time.time(),
         notas=body.notas,

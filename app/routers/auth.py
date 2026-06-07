@@ -118,6 +118,7 @@ def delete_me(response: Response, current_user: User = Depends(get_current_user)
 def update_me(body: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     new_name = (body.get("name") or "").strip()
     new_pass = body.get("password") or ""
+    old_pass = body.get("old_password") or ""
     if not new_name and not new_pass:
         raise HTTPException(status_code=400, detail="Nada que actualizar")
     if new_name:
@@ -125,6 +126,10 @@ def update_me(body: dict, current_user: User = Depends(get_current_user), db: Se
     if new_pass:
         if len(new_pass) < 6:
             raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+        if not old_pass:
+            raise HTTPException(status_code=400, detail="Debes ingresar tu contraseña actual")
+        if not verify_password(old_pass, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
         current_user.hashed_password = hash_password(new_pass)
     db.commit()
     db.refresh(current_user)
