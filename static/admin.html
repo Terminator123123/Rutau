@@ -742,6 +742,27 @@
   </div>
 </div>
 
+<!-- Modal recarga de saldo -->
+<div id="recarga-modal" class="hidden" style="position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:14px;padding:2rem 1.75rem;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <h3 style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:0.25rem">Registrar recarga</h3>
+    <p id="recarga-conductor-name" style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem"></p>
+    <div class="field">
+      <label>Monto (COP)</label>
+      <input type="number" id="recarga-monto" placeholder="ej: 5000" min="1" step="100" />
+    </div>
+    <div class="field">
+      <label>Notas (opcional)</label>
+      <input type="text" id="recarga-notas" placeholder="Pago en efectivo, transferencia…" maxlength="100" />
+    </div>
+    <div id="recarga-msg" class="hidden" style="background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.2);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.78rem;color:var(--danger);margin-bottom:0.75rem"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+      <button onclick="closeRecargaModal()" style="padding:0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--muted);font-family:var(--font);font-size:0.85rem;cursor:pointer">Cancelar</button>
+      <button id="recarga-btn" onclick="submitRecarga()" style="padding:0.75rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:8px;color:#fff;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer">Registrar recarga</button>
+    </div>
+  </div>
+</div>
+
 <div id="adm-toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -849,11 +870,23 @@
       const docsHtml = docs.map(d =>
         `<span class="doc-chip ${c[d.key] ? 'ok' : 'missing'}">${c[d.key] ? '✓' : '✗'} ${d.label}</span>`
       ).join('');
+      const vehicleHtml = (c.placa_numero || c.color_carro || c.modelo_carro)
+        ? `<div style="font-size:0.72rem;color:var(--muted);display:flex;gap:0.5rem;flex-wrap:wrap">
+            ${c.placa_numero ? `<span>🚗 <strong>${esc(c.placa_numero)}</strong></span>` : ''}
+            ${c.color_carro  ? `<span>${esc(c.color_carro)}</span>` : ''}
+            ${c.modelo_carro ? `<span>${esc(c.modelo_carro)}</span>` : ''}
+           </div>` : '';
+      const personalHtml = (c.cedula_numero || c.telefono)
+        ? `<div style="font-size:0.72rem;color:var(--muted);display:flex;gap:0.75rem;flex-wrap:wrap">
+            ${c.cedula_numero ? `<span>CC: ${esc(c.cedula_numero)}</span>` : ''}
+            ${c.telefono      ? `<span>Tel: ${esc(c.telefono)}</span>` : ''}
+           </div>` : '';
       return `<div class="cond-card" id="ccard-${c.id}">
         <div class="cond-card-head">
           <div class="cond-mini-avatar">${initials}</div>
           <div><div class="cond-card-name">${esc(c.name)}</div><div class="cond-card-email">${esc(c.email)}</div></div>
         </div>
+        ${personalHtml}${vehicleHtml}
         <div class="docs-row">${docsHtml}</div>
         <div class="cond-actions">
           <button class="btn-approve" onclick="approveConductor(${c.id})">✓ Aprobar</button>
@@ -907,6 +940,19 @@
           : `<span class="cf-doc-btn no">${d.label} —</span>`
       ).join('');
 
+      const saldo = c.saldo != null ? c.saldo : 0;
+      const saldoColor = saldo < 0 ? 'var(--danger)' : saldo === 0 ? 'var(--warning)' : 'var(--success)';
+      const saldoHtml = `<span style="font-size:0.75rem;font-weight:700;color:${saldoColor}">
+        Saldo: $${saldo.toLocaleString('es-CO')}
+      </span>`;
+
+      const vehicleHtml = (c.placa_numero || c.color_carro || c.modelo_carro)
+        ? `<div style="font-size:0.72rem;color:var(--muted);display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.1rem">
+            ${c.placa_numero ? `<span>🚗 <strong>${esc(c.placa_numero)}</strong></span>` : ''}
+            ${c.color_carro  ? `<span>${esc(c.color_carro)}</span>` : ''}
+            ${c.modelo_carro ? `<span>${esc(c.modelo_carro)}</span>` : ''}
+           </div>` : '';
+
       const actionHtml = c.conductor_status === 'pending'
         ? `<div style="display:flex;gap:0.4rem;margin-top:0.25rem">
             <button class="btn-approve" style="flex:1;padding:0.35rem" onclick="approveConductor(${c.id})">✓ Aprobar</button>
@@ -920,11 +966,14 @@
           <div style="min-width:0">
             <div class="cf-name">${esc(c.name)}</div>
             <div class="cf-email">${esc(c.email)}</div>
+            ${vehicleHtml}
           </div>
           <span class="cf-status ${c.conductor_status || 'pending'}" style="margin-left:auto;flex-shrink:0">${statusLabel}</span>
         </div>
-        <div class="cf-meta">${ratingHtml}</div>
+        <div class="cf-meta">${ratingHtml}${saldoHtml}</div>
         <div class="cf-actions">${docsHtml}</div>
+        <button class="cf-doc-btn has" style="width:100%;justify-content:center;margin-top:0.25rem;padding:0.35rem"
+          onclick="openRecargaModal(${c.id}, '${esc(c.name)}')">+ Recargar saldo</button>
         ${actionHtml}
       </div>`;
     }).join('');
@@ -1108,6 +1157,52 @@
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Recarga modal ─────────────────────────────────────────────────────────
+  let _recargaTargetId = null;
+
+  function openRecargaModal(id, name) {
+    _recargaTargetId = id;
+    document.getElementById('recarga-conductor-name').textContent = name;
+    document.getElementById('recarga-monto').value = '';
+    document.getElementById('recarga-notas').value = '';
+    document.getElementById('recarga-msg').classList.add('hidden');
+    document.getElementById('recarga-modal').classList.remove('hidden');
+  }
+
+  function closeRecargaModal() {
+    document.getElementById('recarga-modal').classList.add('hidden');
+    _recargaTargetId = null;
+  }
+
+  async function submitRecarga() {
+    const monto = parseFloat(document.getElementById('recarga-monto').value);
+    const notas = document.getElementById('recarga-notas').value.trim() || null;
+    const msg   = document.getElementById('recarga-msg');
+    const btn   = document.getElementById('recarga-btn');
+
+    if (!monto || monto <= 0) {
+      msg.textContent = 'Ingresa un monto válido mayor a 0.';
+      msg.classList.remove('hidden'); return;
+    }
+
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+    try {
+      const res = await fetchA(`/admin/conductors/${_recargaTargetId}/recarga`, {
+        method: 'POST',
+        body: JSON.stringify({ monto, notas }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error');
+      toast(`Recarga de $${monto.toLocaleString('es-CO')} registrada`);
+      closeRecargaModal();
+      await loadDashboard();
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'Registrar recarga';
+    }
   }
 
   // Auto-restore session
