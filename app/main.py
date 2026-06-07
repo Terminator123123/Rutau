@@ -1,9 +1,12 @@
 import json
+import os
+import secrets
 import uuid
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
@@ -13,6 +16,23 @@ from app.manager import manager, trip_manager
 from app.models import ALLOWED_ZONES, QUICK_MESSAGES, LocationUpdate, UserLocation
 from app.dependencies import require_admin
 from app.routers import auth, conductor, trips, admin, google_auth
+
+# Basic auth con auto_error=True para que el navegador muestre el diálogo nativo en /docs
+_docs_basic = HTTPBasic(auto_error=True)
+
+def _require_docs_auth(credentials: HTTPBasicCredentials = Depends(_docs_basic)):
+    admin_user = os.getenv("ADMIN_USER", "admin")
+    admin_pass = os.getenv("ADMIN_PASSWORD", "colectivou2026")
+    ok = (
+        secrets.compare_digest(credentials.username.encode(), admin_user.encode()) and
+        secrets.compare_digest(credentials.password.encode(), admin_pass.encode())
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=401,
+            detail="Acceso denegado",
+            headers={"WWW-Authenticate": "Basic"},
+        )
 
 app = FastAPI(
     title="ColectivoU",
@@ -37,12 +57,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ── Protected docs ────────────────────────────────────────────────────────────
 
 @app.get("/docs", include_in_schema=False)
-async def docs(_=Depends(require_admin)):
+async def docs(_=Depends(_require_docs_auth)):
     return get_swagger_ui_html(openapi_url="/openapi.json", title="ColectivoU · Docs")
 
 
 @app.get("/openapi.json", include_in_schema=False)
-async def openapi(_=Depends(require_admin)):
+async def openapi(_=Depends(_require_docs_auth)):
     return app.openapi()
 
 # ── Static pages ──────────────────────────────────────────────────────────────
