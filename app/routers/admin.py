@@ -68,6 +68,7 @@ def admin_all_conductors(db: Session = Depends(get_db), _=Depends(require_admin)
             "modelo_carro":  u.modelo_carro,
             "rating_avg":    round(u.rating_sum / u.rating_count, 1) if u.rating_count else None,
             "rating_count":  u.rating_count,
+            "saldo":         u.saldo if u.saldo is not None else 0.0,
         }
         for u in users
     ]

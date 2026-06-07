@@ -1172,6 +1172,9 @@
     document.getElementById('recarga-monto').value = '';
     document.getElementById('recarga-notas').selectedIndex = 0;
     document.getElementById('recarga-msg').classList.add('hidden');
+    const btn = document.getElementById('recarga-btn');
+    btn.disabled = false;
+    btn.textContent = 'Registrar recarga';
     document.getElementById('recarga-modal').classList.remove('hidden');
   }
 
