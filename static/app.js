@@ -43,6 +43,7 @@ window.addEventListener("DOMContentLoaded", () => {
   setupFormValidation();
   const params = new URLSearchParams(location.search);
   if (params.get("verified") === "1") showVerifiedBanner();
+  if (params.get("google_error") === "1") showGoogleErrorBanner();
   const saved = readSessionCookie();
   if (saved) {
     currentUser = saved;
@@ -88,6 +89,14 @@ function showVerifiedBanner() {
   if (msg) {
     msg.className = "form-msg success";
     msg.textContent = "¡Correo verificado! Ya puedes iniciar sesión.";
+  }
+}
+
+function showGoogleErrorBanner() {
+  const msg = document.getElementById("login-error");
+  if (msg) {
+    msg.className = "form-msg error";
+    msg.textContent = "No se pudo iniciar sesión con Google. Intenta de nuevo.";
   }
 }
 
@@ -228,7 +237,134 @@ async function handleRegister(e) {
   }
 }
 
-// ── Document upload (conductor pending) ────────────────────────────────────
+// ── Onboarding wizard (conductor nuevo) ───────────────────────────────────
+
+let _currentOnboardingStep = 1;
+
+function showConductorUpgrade() {
+  closeDrawer();
+  showOnboardingModal();
+}
+
+function showOnboardingModal() {
+  _currentOnboardingStep = 1;
+  _renderOnboardingStep(1);
+  document.getElementById("onboarding-modal").classList.remove("hidden");
+}
+
+function goToOnboardingStep(step) {
+  // Validate current step before advancing
+  if (step > _currentOnboardingStep) {
+    if (!_validateOnboardingStep(_currentOnboardingStep)) return;
+  }
+  _currentOnboardingStep = step;
+  _renderOnboardingStep(step);
+}
+
+function _validateOnboardingStep(step) {
+  if (step === 1) {
+    const cedula  = document.getElementById("ob-cedula-numero").value.trim();
+    const telefono = document.getElementById("ob-telefono").value.trim();
+    const msg = document.getElementById("ob-msg-1");
+    if (!cedula || !telefono) {
+      msg.className = "form-msg error";
+      msg.textContent = "Completa todos los campos antes de continuar.";
+      return false;
+    }
+    msg.className = "form-msg hidden";
+    return true;
+  }
+  if (step === 2) {
+    const placa  = document.getElementById("ob-placa").value.trim();
+    const color  = document.getElementById("ob-color").value.trim();
+    const modelo = document.getElementById("ob-modelo").value.trim();
+    const msg = document.getElementById("ob-msg-2");
+    if (!placa || !color || !modelo) {
+      msg.className = "form-msg error";
+      msg.textContent = "Completa todos los campos antes de continuar.";
+      return false;
+    }
+    msg.className = "form-msg hidden";
+    return true;
+  }
+  return true;
+}
+
+function _renderOnboardingStep(step) {
+  [1, 2, 3].forEach(i => {
+    document.getElementById(`ob-page-${i}`).classList.toggle("hidden", i !== step);
+    const dot = document.querySelector(`#ob-ind-${i} .ob-dot`);
+    if (dot) {
+      dot.classList.toggle("active", i === step);
+      dot.classList.toggle("done", i < step);
+    }
+    if (i < 3) {
+      const line = document.getElementById(`ob-line-${i}`);
+      if (line) line.classList.toggle("done", i < step);
+    }
+  });
+}
+
+async function submitOnboarding() {
+  if (!_validateOnboardingStep(2)) { goToOnboardingStep(2); return; }
+
+  const cedula  = document.getElementById("ob-doc-cedula").files[0];
+  const selfie  = document.getElementById("ob-doc-selfie").files[0];
+  const plate   = document.getElementById("ob-doc-plate").files[0];
+  const soat    = document.getElementById("ob-doc-soat").files[0];
+  const msg     = document.getElementById("ob-msg-3");
+  const btn     = document.getElementById("ob-submit-btn");
+
+  if (!cedula || !selfie || !plate || !soat) {
+    msg.className = "form-msg error";
+    msg.textContent = "Debes subir los 4 documentos requeridos.";
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append("cedula_numero", document.getElementById("ob-cedula-numero").value.trim());
+  fd.append("telefono",      document.getElementById("ob-telefono").value.trim());
+  fd.append("placa_numero",  document.getElementById("ob-placa").value.trim().toUpperCase());
+  fd.append("color_carro",   document.getElementById("ob-color").value.trim());
+  fd.append("modelo_carro",  document.getElementById("ob-modelo").value.trim());
+  fd.append("cedula", cedula);
+  fd.append("selfie", selfie);
+  fd.append("plate",  plate);
+  fd.append("soat",   soat);
+
+  setLoading(btn, true);
+  msg.className = "form-msg hidden";
+
+  try {
+    const res  = await fetch("/conductor/documents", { method: "POST", credentials: "include", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Error al enviar");
+
+    document.getElementById("onboarding-modal").classList.add("hidden");
+
+    // Actualizar estado local del usuario
+    const wasStudent = currentUser.role === "estudiante";
+    currentUser.role             = "conductor";
+    currentUser.conductor_status = "pending";
+
+    if (wasStudent) {
+      // Ocultar controles de estudiante, mostrar banner de pendiente
+      document.getElementById("student-actions").classList.add("hidden");
+      document.getElementById("dr-become-conductor")?.classList.add("hidden");
+      document.getElementById("dr-conductor")?.classList.remove("hidden");
+    }
+
+    document.getElementById("pending-banner").classList.remove("hidden");
+
+    if (!lastLat) requestLocation();
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = err.message;
+    setLoading(btn, false);
+  }
+}
+
+// ── Document upload (conductor pendiente — re-subida desde drawer) ─────────
 
 function showDocsModal() {
   document.getElementById("docs-modal").classList.remove("hidden");
@@ -303,6 +439,22 @@ function startMap() {
       refreshPassengersEmpty();
       updateStatusButton();
       updateCounterDisplay(0);
+    } else if (!currentUser.conductor_status) {
+      // Conductor nuevo — mostrar wizard después de la transición al mapa
+      const authScreen = document.getElementById("auth-screen");
+      const card       = authScreen.querySelector(".auth-card");
+      const overlay    = authScreen.querySelector(".auth-overlay");
+      card.style.transform = "scale(1.12) translateY(-12px)";
+      card.style.opacity   = "0";
+      overlay.style.opacity        = "0";
+      overlay.style.backdropFilter = "blur(0px)";
+      setTimeout(() => {
+        authScreen.classList.add("hidden");
+        document.getElementById("topbar").classList.remove("hidden");
+        map.invalidateSize();
+        showOnboardingModal();
+      }, 580);
+      return;
     } else {
       const pbTitle = document.getElementById("pb-title");
       if (currentUser.conductor_status === "rejected") {
@@ -885,6 +1037,14 @@ function openDrawer() {
   document.getElementById("dr-stars").innerHTML = renderStarRow(
     currentUser.rating_avg, currentUser.rating_count, "0.82rem"
   );
+
+  // Botón "Quiero ser conductor" solo para estudiantes
+  const becomeSection = document.getElementById("dr-become-conductor");
+  if (currentUser.role === "estudiante") {
+    becomeSection.classList.remove("hidden");
+  } else {
+    becomeSection.classList.add("hidden");
+  }
 
   const condSection = document.getElementById("dr-conductor");
   if (currentUser.role === "conductor") {

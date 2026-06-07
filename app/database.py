@@ -1,6 +1,7 @@
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+import time
 
 _db_url = os.getenv("DB_URL", "sqlite:///./colectivou.db")
 
@@ -41,6 +42,25 @@ class User(Base):
     # Rating (conductors only)
     rating_sum          = Column(Float, default=0.0, server_default="0")
     rating_count        = Column(Integer, default=0, server_default="0")
+    # Wallet (conductors only)
+    saldo               = Column(Float, default=0.0, server_default="0")
+    # Conductor personal & vehicle info
+    cedula_numero       = Column(String, nullable=True)
+    telefono            = Column(String, nullable=True)
+    placa_numero        = Column(String, nullable=True)
+    color_carro         = Column(String, nullable=True)
+    modelo_carro        = Column(String, nullable=True)
+
+
+class Recarga(Base):
+    __tablename__ = "recargas"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    conductor_id  = Column(Integer, nullable=False, index=True)
+    admin_id      = Column(Integer, nullable=False)
+    monto         = Column(Float, nullable=False)
+    registrada_en = Column(Float, nullable=False)
+    notas         = Column(String, nullable=True)
 
 
 class Trip(Base):
@@ -74,6 +94,12 @@ _user_columns = [
     ("terms_accepted_at",   "REAL"),
     ("rating_sum",          "REAL DEFAULT 0"),
     ("rating_count",        "INTEGER DEFAULT 0"),
+    ("saldo",               "REAL DEFAULT 0"),
+    ("cedula_numero",       "VARCHAR"),
+    ("telefono",            "VARCHAR"),
+    ("placa_numero",        "VARCHAR"),
+    ("color_carro",         "VARCHAR"),
+    ("modelo_carro",        "VARCHAR"),
 ]
 
 with engine.connect() as _conn:

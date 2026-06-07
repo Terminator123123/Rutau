@@ -2,11 +2,12 @@ import os
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
-from app.database import get_db, User, UPLOADS_DIR
+from app.database import get_db, User, Recarga, UPLOADS_DIR
+from app.models import SaldoOut
 
 router = APIRouter(tags=["Conductor"])
 
@@ -33,17 +34,20 @@ def _validate_file(file: UploadFile, contents: bytes):
 
 @router.post("/conductor/documents")
 async def upload_documents(
-    cedula:  UploadFile = File(...),
-    selfie:  UploadFile = File(...),
-    plate:   UploadFile = File(...),
-    soat:    UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    cedula_numero: str          = Form(default=None),
+    telefono:      str          = Form(default=None),
+    placa_numero:  str          = Form(default=None),
+    color_carro:   str          = Form(default=None),
+    modelo_carro:  str          = Form(default=None),
+    cedula:        UploadFile   = File(...),
+    selfie:        UploadFile   = File(...),
+    plate:         UploadFile   = File(...),
+    soat:          UploadFile   = File(...),
+    current_user:  User         = Depends(get_current_user),
+    db:            Session      = Depends(get_db),
 ):
-    if current_user.role != "conductor":
-        raise HTTPException(403, "Solo conductores pueden subir documentos")
     if current_user.conductor_status == "approved":
-        raise HTTPException(400, "Tu cuenta ya está aprobada")
+        raise HTTPException(400, "Tu cuenta de conductor ya está aprobada")
 
     files = {"cedula": cedula, "selfie": selfie, "plate": plate, "soat": soat}
     paths = {}
@@ -61,14 +65,29 @@ async def upload_documents(
         paths[doc_type] = filepath
 
     user = db.query(User).filter(User.id == current_user.id).first()
-    user.cedula_path = paths["cedula"]
-    user.selfie_path = paths["selfie"]
-    user.plate_path  = paths["plate"]
-    user.soat_path   = paths["soat"]
+    user.cedula_path   = paths["cedula"]
+    user.selfie_path   = paths["selfie"]
+    user.plate_path    = paths["plate"]
+    user.soat_path     = paths["soat"]
+    if cedula_numero: user.cedula_numero = cedula_numero.strip()
+    if telefono:      user.telefono      = telefono.strip()
+    if placa_numero:  user.placa_numero  = placa_numero.strip().upper()
+    if color_carro:   user.color_carro   = color_carro.strip()
+    if modelo_carro:  user.modelo_carro  = modelo_carro.strip()
+    user.role             = "conductor"
     user.conductor_status = "pending"
     db.commit()
 
     return {"message": "Documentos recibidos. Tu cuenta será revisada pronto."}
+
+
+@router.get("/conductor/saldo", response_model=SaldoOut)
+def conductor_saldo(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "conductor":
+        raise HTTPException(403, "Solo conductores")
+    user = db.query(User).filter(User.id == current_user.id).first()
+    saldo = user.saldo or 0.0
+    return SaldoOut(saldo=saldo, deuda=saldo < 0)
 
 
 @router.get("/conductor/status")

@@ -122,9 +122,18 @@ class TripManager:
         # Get approved conductors sorted by distance
         # Only include conductors that have been approved (conductor_status == 'approved')
         candidates_raw = self.conn.get_approved_conductors_sorted(lat, lng)
-        # Filter further: only approved conductors (db check already done at WS connect via manager field)
-        # We trust conductor_db_id is set only for approved conductors
-        candidates = [sid for sid, loc in candidates_raw if loc.conductor_db_id is not None]
+        candidate_map = {sid: loc for sid, loc in candidates_raw if loc.conductor_db_id is not None}
+        if candidate_map:
+            from app.database import User
+            db_ids = [loc.conductor_db_id for loc in candidate_map.values()]
+            solvent_ids = {
+                u.id for u in db.query(User).filter(
+                    User.id.in_(db_ids), User.saldo > 0
+                ).all()
+            }
+            candidates = [sid for sid, loc in candidate_map.items() if loc.conductor_db_id in solvent_ids]
+        else:
+            candidates = []
 
         if not candidates:
             return None
@@ -275,11 +284,14 @@ class TripManager:
         self._cleanup(request_id)
 
     async def mark_onboard(self, conductor_session: str, trip_id: int, db):
-        from app.database import Trip
+        from app.database import Trip, User
         trip = db.query(Trip).filter(Trip.id == trip_id).first()
         if trip:
             trip.status = "onboard"
             trip.onboard_at = time.time()
+            conductor = db.query(User).filter(User.id == trip.conductor_id).first()
+            if conductor:
+                conductor.saldo = (conductor.saldo or 0.0) - 100
             db.commit()
         # Find student session for this trip
         for sid, tid in self.active_trips.items():

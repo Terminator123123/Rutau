@@ -1,12 +1,14 @@
 import os
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.database import get_db, User, UPLOADS_DIR
+from app.database import get_db, User, Recarga, UPLOADS_DIR
 from app.dependencies import require_admin
+from app.models import RecargaRequest, RecargaOut
 
 router = APIRouter(tags=["Admin"])
 
@@ -55,12 +57,17 @@ def admin_all_conductors(db: Session = Depends(get_db), _=Depends(require_admin)
             "id": u.id, "name": u.name, "email": u.email,
             "conductor_status": u.conductor_status,
             "is_verified": u.is_verified,
-            "has_cedula": bool(u.cedula_path),
-            "has_selfie": bool(u.selfie_path),
-            "has_plate":  bool(u.plate_path),
-            "has_soat":   bool(u.soat_path),
-            "rating_avg": round(u.rating_sum / u.rating_count, 1) if u.rating_count else None,
-            "rating_count": u.rating_count,
+            "has_cedula":    bool(u.cedula_path),
+            "has_selfie":    bool(u.selfie_path),
+            "has_plate":     bool(u.plate_path),
+            "has_soat":      bool(u.soat_path),
+            "cedula_numero": u.cedula_numero,
+            "telefono":      u.telefono,
+            "placa_numero":  u.placa_numero,
+            "color_carro":   u.color_carro,
+            "modelo_carro":  u.modelo_carro,
+            "rating_avg":    round(u.rating_sum / u.rating_count, 1) if u.rating_count else None,
+            "rating_count":  u.rating_count,
         }
         for u in users
     ]
@@ -118,6 +125,60 @@ def admin_get_conductor_doc(user_id: int, doc_type: str, db: Session = Depends(g
     if not filepath or not os.path.exists(filepath):
         raise HTTPException(404, "Documento no disponible")
     return FileResponse(filepath)
+
+
+@router.post("/admin/conductors/{user_id}/recarga", response_model=RecargaOut)
+def admin_registrar_recarga(
+    user_id: int,
+    body: RecargaRequest,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    conductor = db.query(User).filter(User.id == user_id, User.role == "conductor").first()
+    if not conductor:
+        raise HTTPException(404, "Conductor no encontrado")
+    if body.monto <= 0:
+        raise HTTPException(400, "El monto debe ser mayor a 0")
+
+    conductor.saldo = (conductor.saldo or 0.0) + body.monto
+
+    recarga = Recarga(
+        conductor_id=user_id,
+        admin_id=admin.id,
+        monto=body.monto,
+        registrada_en=time.time(),
+        notas=body.notas,
+    )
+    db.add(recarga)
+    db.commit()
+    db.refresh(recarga)
+    return recarga
+
+
+@router.get("/admin/conductors/{user_id}/recargas", response_model=list[RecargaOut])
+def admin_historial_recargas(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    conductor = db.query(User).filter(User.id == user_id, User.role == "conductor").first()
+    if not conductor:
+        raise HTTPException(404, "Conductor no encontrado")
+    recargas = db.query(Recarga).filter(Recarga.conductor_id == user_id).order_by(Recarga.registrada_en.desc()).all()
+    return recargas
+
+
+@router.get("/admin/conductors/{user_id}/saldo")
+def admin_ver_saldo_conductor(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    conductor = db.query(User).filter(User.id == user_id, User.role == "conductor").first()
+    if not conductor:
+        raise HTTPException(404, "Conductor no encontrado")
+    saldo = conductor.saldo or 0.0
+    return {"conductor_id": user_id, "name": conductor.name, "saldo": saldo, "deuda": saldo < 0}
 
 
 @router.get("/admin/documents/{user_id}/{filename}")

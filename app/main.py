@@ -12,7 +12,7 @@ from app.auth import get_user_from_cookie, COOKIE_NAME
 from app.manager import manager, trip_manager
 from app.models import ALLOWED_ZONES, QUICK_MESSAGES, LocationUpdate, UserLocation
 from app.dependencies import require_admin
-from app.routers import auth, conductor, trips, admin
+from app.routers import auth, conductor, trips, admin, google_auth
 
 app = FastAPI(
     title="ColectivoU",
@@ -28,6 +28,7 @@ app.include_router(auth.router)
 app.include_router(conductor.router)
 app.include_router(trips.router)
 app.include_router(admin.router)
+app.include_router(google_auth.router)
 
 # ── Static files ──────────────────────────────────────────────────────────────
 

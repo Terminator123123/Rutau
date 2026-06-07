@@ -12,3 +12,6 @@ dist/
 uploads/
 _privado/
 reguistro de conversacion/
+client_secret*.json
+GUIA_EXPO.md
+VISION_NEGOCIO.md

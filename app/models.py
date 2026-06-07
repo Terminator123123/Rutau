@@ -72,6 +72,25 @@ class TripRatingRequest(BaseModel):
     rating: int   # 1-5
 
 
+class RecargaRequest(BaseModel):
+    monto: float
+    notas: Optional[str] = None
+
+
+class RecargaOut(BaseModel):
+    id:            int
+    conductor_id:  int
+    admin_id:      int
+    monto:         float
+    registrada_en: float
+    notas:         Optional[str] = None
+
+
+class SaldoOut(BaseModel):
+    saldo:         float
+    deuda:         bool   # True si saldo < 0
+
+
 class ConductorProfileOut(BaseModel):
     id:          int
     name:        str
