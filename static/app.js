@@ -580,6 +580,7 @@ function connectWS(lat, lng) {
     if (e.code === 4001) { showToast("Sesión expirada. Vuelve a iniciar sesión."); logout(); return; }
     if (e.code === 4003) { showToast("Cuenta no verificada."); logout(); return; }
     setStatus("connecting", "Reconectando...");
+    if (lastLat !== null) setTimeout(() => connectWS(lastLat, lastLng), 3000);
   };
   ws.onerror = () => setStatus("error", "Error de conexion");
 }
@@ -650,6 +651,25 @@ function handleMessage(msg) {
 
     case "trip_cancelled_active":
       onTripCancelledActive(msg);
+      break;
+
+    case "trip_taken":
+    case "trip_already_taken":
+      closeRequestModal();
+      showToast("Otro conductor aceptó este viaje primero.");
+      break;
+
+    case "trip_restored":
+      activeTripId = msg.trip_id;
+      showToast("Reconectado — viaje activo restaurado.");
+      break;
+
+    case "trip_partner_disconnected":
+      showToast("La otra persona perdió conexión. Esperando 45 s...");
+      break;
+
+    case "trip_partner_reconnected":
+      showToast("La otra persona se reconectó.");
       break;
 
     case "onboard_confirmed":
@@ -875,7 +895,6 @@ function addPassengerToPanel(tripId, name) {
   item.innerHTML = `
     <div class="passenger-name">${name}</div>
     <div class="passenger-btns">
-      <button class="btn-paction onboard" onclick="markOnboard(${tripId})">A bordo</button>
       <button class="btn-paction dropoff" onclick="markDropoff(${tripId}, 0)">Dejó</button>
     </div>`;
   list.appendChild(item);

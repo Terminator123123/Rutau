@@ -158,6 +158,10 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                 )
                 location = manager.set_location(session_id, location)
                 await manager.broadcast({"type": "update", "user": location.model_dump()})
+                # Restore trip if user reconnected during grace period
+                restored = await trip_manager.try_reconnect_trip(session_id, user.id)
+                if restored:
+                    await manager.send_to(session_id, {"type": "trip_restored", "trip_id": restored})
 
             elif msg_type == "trip_request":
                 zone = payload.get("zone_destination", "")
@@ -224,5 +228,6 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
 
     except WebSocketDisconnect:
         await trip_manager.cancel_request(session_id)
+        await trip_manager.handle_disconnect(session_id, user.id, db)
         manager.disconnect(session_id)
         await manager.broadcast({"type": "remove", "id": session_id})
