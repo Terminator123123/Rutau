@@ -135,7 +135,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             msg_type = payload.get("type", "location")
 
             if msg_type == "location" or msg_type not in (
-                "trip_request", "trip_cancel", "trip_accept", "trip_reject",
+                "trip_request", "trip_cancel", "trip_cancel_active", "trip_accept", "trip_reject",
                 "zone_set", "passenger_onboard", "passenger_dropoff", "quick_message",
             ):
                 update = LocationUpdate(**{k: v for k, v in payload.items() if k != "type"})
@@ -183,6 +183,9 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
 
             elif msg_type == "trip_cancel":
                 await trip_manager.cancel_request(session_id)
+
+            elif msg_type == "trip_cancel_active":
+                await trip_manager.cancel_active_trip(session_id, db)
 
             elif msg_type == "trip_accept":
                 request_id = payload.get("request_id")

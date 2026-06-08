@@ -68,12 +68,15 @@
       </div>
     </div>
 
-    <!-- Panel de conductor asignado (estudiante, después de aceptar) -->
-    <div id="conductor-approaching" class="hidden">
-      <div class="approaching-card">
-        <p class="approaching-title">Conductor en camino</p>
-        <p id="approaching-name" class="approaching-name"></p>
-        <p id="approaching-zone" class="approaching-zone"></p>
+    <!-- Conductor: viaje aceptado, esperando abordaje -->
+    <div id="conductor-accepted-trip" class="hidden">
+      <div class="accepted-trip-banner">
+        <div class="accepted-trip-label">Pasajero asignado</div>
+        <div id="accepted-student-name" class="accepted-student-name"></div>
+        <div class="accepted-trip-btns">
+          <button class="btn-paction onboard" onclick="markOnboardPending()">A bordo</button>
+          <button class="btn-paction cancel-trip" onclick="cancelActiveTrip()">Cancelar</button>
+        </div>
       </div>
     </div>
 
@@ -382,6 +385,35 @@
     <button type="button" class="btn-link" onclick="closePasswordModal()">Cancelar</button>
   </div>
 </div>
+<!-- Bottom Sheet: conductor asignado (estudiante) -->
+<div id="trip-bottom-sheet" class="hidden">
+  <div class="trip-sheet">
+    <div class="trip-sheet-handle"></div>
+    <div class="trip-sheet-header">
+      <span class="trip-sheet-status">Conductor en camino</span>
+      <span id="trip-eta-badge" class="trip-eta-badge hidden"></span>
+    </div>
+    <div class="trip-sheet-card">
+      <div class="trip-conductor-avatar">
+        <svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.92)" width="28" height="28">
+          <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+        </svg>
+      </div>
+      <div>
+        <div id="trip-conductor-name" class="trip-conductor-name"></div>
+        <div id="trip-conductor-stars" class="trip-conductor-stars"></div>
+      </div>
+    </div>
+    <div class="trip-vehicle-row">
+      <span id="trip-vehicle-plate" class="trip-pill plate"></span>
+      <span id="trip-vehicle-color" class="trip-pill"></span>
+      <span id="trip-vehicle-model" class="trip-pill"></span>
+    </div>
+    <div id="trip-zone-row" class="trip-zone-row"></div>
+    <button id="btn-cancel-active-trip" class="btn-cancel-active" onclick="cancelActiveTrip()">Cancelar viaje</button>
+  </div>
+</div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/static/app.js"></script>
 </body>

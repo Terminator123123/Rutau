@@ -239,22 +239,51 @@ class TripManager:
 
         self._cleanup(request_id)
 
-        # Notify student
+        # Query conductor vehicle info and rating
+        vehicle_info = {}
+        rating_count = 0
+        if conductor_db_id:
+            from app.database import User as DbUser
+            conductor_user = db.query(DbUser).filter(DbUser.id == conductor_db_id).first()
+            if conductor_user:
+                vehicle_info = {
+                    "placa":  conductor_user.placa_numero  or "",
+                    "color":  conductor_user.color_carro   or "",
+                    "modelo": conductor_user.modelo_carro  or "",
+                }
+                rating_count = conductor_user.rating_count or 0
+
+        # Calculate ETA (assume 25 km/h urban avg = 6.94 m/s)
+        eta_seconds = None
+        if conductor_loc:
+            dist_m = haversine(req.lat, req.lng, conductor_loc.lat, conductor_loc.lng)
+            eta_seconds = max(60, int(dist_m / 6.94))
+
         conductor_info = {}
         if conductor_loc:
             conductor_info = {
-                "lat": conductor_loc.lat,
-                "lng": conductor_loc.lng,
-                "name": conductor_loc.name,
-                "zone": conductor_loc.zone_destination,
-                "rating": conductor_loc.rating_avg,
+                "lat":          conductor_loc.lat,
+                "lng":          conductor_loc.lng,
+                "name":         conductor_loc.name,
+                "zone":         conductor_loc.zone_destination,
+                "rating":       conductor_loc.rating_avg,
+                "rating_count": rating_count,
+                "eta_seconds":  eta_seconds,
+                **vehicle_info,
             }
 
         await self.conn.send_to(req.student_session, {
-            "type": "trip_accepted",
+            "type":       "trip_accepted",
             "request_id": request_id,
-            "trip_id": trip.id,
-            "conductor": conductor_info,
+            "trip_id":    trip.id,
+            "conductor":  conductor_info,
+        })
+
+        # Notify conductor with trip_id so they can reference it for onboard/dropoff
+        await self.conn.send_to(conductor_session, {
+            "type":         "trip_accept_confirmed",
+            "trip_id":      trip.id,
+            "student_name": req.student_name,
         })
 
         return trip.id
@@ -282,6 +311,23 @@ class TripManager:
                 "request_id": request_id,
             })
         self._cleanup(request_id)
+
+    async def cancel_active_trip(self, session_id: str, db):
+        """Cancel an accepted trip (before onboard) by either party."""
+        trip_id = self.active_trips.get(session_id)
+        if not trip_id:
+            return
+        from app.database import Trip
+        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if trip and trip.status == "accepted":
+            trip.status = "cancelled"
+            db.commit()
+        for sid, tid in list(self.active_trips.items()):
+            if tid == trip_id and sid != session_id:
+                await self.conn.send_to(sid, {"type": "trip_cancelled_active", "trip_id": trip_id})
+                del self.active_trips[sid]
+                break
+        self.active_trips.pop(session_id, None)
 
     async def mark_onboard(self, conductor_session: str, trip_id: int, db):
         from app.database import Trip, User

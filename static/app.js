@@ -15,10 +15,11 @@ let currentZone  = "";
 let availableZones = [];
 
 // Trip state
-let activeRequestId  = null;
-let activeTripId     = null;
-let pendingRatingTrip = null;
+let activeRequestId      = null;
+let activeTripId         = null;
+let pendingRatingTrip    = null;
 let requestTimerInterval = null;
+let _pendingBoardingTrip = null; // conductor: { trip_id, studentName }
 
 // Map state
 let showingNearby = false;
@@ -502,7 +503,8 @@ async function logout() {
   document.getElementById("passengers-panel").classList.add("hidden");
   document.getElementById("student-actions").classList.add("hidden");
   document.getElementById("waiting-overlay").classList.add("hidden");
-  document.getElementById("conductor-approaching").classList.add("hidden");
+  document.getElementById("trip-bottom-sheet").classList.add("hidden");
+  document.getElementById("conductor-accepted-trip").classList.add("hidden");
   document.getElementById("pending-banner").classList.add("hidden");
 
   const authScreen = document.getElementById("auth-screen");
@@ -634,6 +636,10 @@ function handleMessage(msg) {
       onTripAccepted(msg);
       break;
 
+    case "trip_accept_confirmed":
+      onTripAcceptConfirmed(msg);
+      break;
+
     case "trip_rejected":
       onTripRejected(msg);
       break;
@@ -642,15 +648,20 @@ function handleMessage(msg) {
       closeRequestModal();
       break;
 
+    case "trip_cancelled_active":
+      onTripCancelledActive(msg);
+      break;
+
     case "onboard_confirmed":
       activeTripId = msg.trip_id;
+      document.getElementById("btn-cancel-active-trip").classList.add("hidden");
       showToast("¡A bordo! Buen viaje.");
       break;
 
     case "dropoff_confirmed":
       activeTripId = null;
       studentLocationEnabled = false;
-      document.getElementById("conductor-approaching").classList.add("hidden");
+      document.getElementById("trip-bottom-sheet").classList.add("hidden");
       break;
 
     case "rate_prompt":
@@ -690,7 +701,7 @@ function cancelRide() {
 
 function resetStudentUI() {
   document.getElementById("waiting-overlay").classList.add("hidden");
-  document.getElementById("conductor-approaching").classList.add("hidden");
+  document.getElementById("trip-bottom-sheet").classList.add("hidden");
   document.getElementById("student-actions").classList.remove("hidden");
   if (lastLat) map.flyTo([lastLat, lastLng], 15, { animate: true, duration: 1.2 });
 }
@@ -700,14 +711,41 @@ function onTripAccepted(msg) {
   activeTripId    = msg.trip_id;
 
   document.getElementById("waiting-overlay").classList.add("hidden");
-  document.getElementById("conductor-approaching").classList.remove("hidden");
 
-  const nameEl = document.getElementById("approaching-name");
-  const zoneEl = document.getElementById("approaching-zone");
-  nameEl.textContent = msg.conductor?.name || "Conductor";
-  zoneEl.textContent = msg.conductor?.zone ? `Destino: ${msg.conductor.zone}` : "";
+  const c = msg.conductor || {};
 
-  // Zoom back to user position
+  // Conductor info
+  document.getElementById("trip-conductor-name").textContent = c.name || "Conductor";
+  document.getElementById("trip-conductor-stars").innerHTML  =
+    (c.rating != null && c.rating_count)
+      ? renderStarRow(c.rating, c.rating_count, "0.78rem")
+      : (c.rating != null ? `<span style="font-size:0.78rem;color:#f59e0b">★ ${c.rating}</span>` : "");
+
+  // Vehicle pills
+  const plateEl = document.getElementById("trip-vehicle-plate");
+  const colorEl = document.getElementById("trip-vehicle-color");
+  const modelEl = document.getElementById("trip-vehicle-model");
+  plateEl.textContent = c.placa  || ""; plateEl.classList.toggle("hidden", !c.placa);
+  colorEl.textContent = c.color  || ""; colorEl.classList.toggle("hidden", !c.color);
+  modelEl.textContent = c.modelo || ""; modelEl.classList.toggle("hidden", !c.modelo);
+
+  // Zone
+  document.getElementById("trip-zone-row").textContent = c.zone ? `Destino: ${c.zone}` : "";
+
+  // ETA
+  const etaBadge = document.getElementById("trip-eta-badge");
+  if (c.eta_seconds != null) {
+    const mins = Math.max(1, Math.round(c.eta_seconds / 60));
+    etaBadge.textContent = `~${mins} min`;
+    etaBadge.classList.remove("hidden");
+  } else {
+    etaBadge.classList.add("hidden");
+  }
+
+  // Cancel button visible (student not yet boarded)
+  document.getElementById("btn-cancel-active-trip").classList.remove("hidden");
+
+  document.getElementById("trip-bottom-sheet").classList.remove("hidden");
   if (lastLat) map.flyTo([lastLat, lastLng], 16, { animate: true, duration: 1 });
 }
 
@@ -717,6 +755,52 @@ function onTripRejected(msg) {
   resetStudentUI();
   if (msg.reason === "no_conductors") {
     showToast("No hay conductores disponibles en este momento.");
+  }
+}
+
+function onTripAcceptConfirmed(msg) {
+  _pendingBoardingTrip = { trip_id: msg.trip_id, studentName: msg.student_name };
+  document.getElementById("accepted-student-name").textContent = msg.student_name;
+  document.getElementById("conductor-accepted-trip").classList.remove("hidden");
+}
+
+function markOnboardPending() {
+  if (!_pendingBoardingTrip) return;
+  const { trip_id, studentName } = _pendingBoardingTrip;
+  sendWS({ type: "passenger_onboard", trip_id: trip_id });
+  addPassengerToPanel(trip_id, studentName);
+  document.getElementById("conductor-accepted-trip").classList.add("hidden");
+  _pendingBoardingTrip = null;
+}
+
+function cancelActiveTrip() {
+  sendWS({ type: "trip_cancel_active" });
+  if (currentUser && currentUser.role === "estudiante") {
+    activeTripId = null;
+    studentLocationEnabled = false;
+    document.getElementById("trip-bottom-sheet").classList.add("hidden");
+    document.getElementById("student-actions").classList.remove("hidden");
+    if (lastLat) map.flyTo([lastLat, lastLng], 15, { animate: true, duration: 1.2 });
+  }
+  if (currentUser && currentUser.role === "conductor") {
+    _pendingBoardingTrip = null;
+    document.getElementById("conductor-accepted-trip").classList.add("hidden");
+  }
+}
+
+function onTripCancelledActive(msg) {
+  activeTripId = null;
+  if (currentUser && currentUser.role === "estudiante") {
+    studentLocationEnabled = false;
+    document.getElementById("trip-bottom-sheet").classList.add("hidden");
+    document.getElementById("student-actions").classList.remove("hidden");
+    if (lastLat) map.flyTo([lastLat, lastLng], 15, { animate: true, duration: 1.2 });
+    showToast("El conductor canceló el viaje.");
+  }
+  if (currentUser && currentUser.role === "conductor") {
+    _pendingBoardingTrip = null;
+    document.getElementById("conductor-accepted-trip").classList.add("hidden");
+    showToast("El estudiante canceló el viaje.");
   }
 }
 
@@ -756,10 +840,9 @@ function showRequestModal(msg) {
 
 function acceptRequest() {
   if (!_pendingRequestId) return;
-  const studentName = document.getElementById("request-student-name").textContent;
   sendWS({ type: "trip_accept", request_id: _pendingRequestId });
-  addPassengerToPanel(_pendingRequestId, studentName);
   closeRequestModal();
+  // panel entry added in onTripAcceptConfirmed → markOnboardPending
 }
 
 function addPassengerToPanel(tripId, name) {
@@ -1157,6 +1240,7 @@ function cleanup() {
   myId = null; myDbId = null; lastLat = null; lastLng = null;
   manualPassengers = 0; activeRequestId = null; activeTripId = null;
   currentZone = ""; showingNearby = false; studentLocationEnabled = false;
+  _pendingBoardingTrip = null;
   if (_myMarker) { _myMarker.remove(); _myMarker = null; }
   Object.keys(_pendingConductors).forEach(k => delete _pendingConductors[k]);
 }
