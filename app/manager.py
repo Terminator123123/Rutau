@@ -362,7 +362,7 @@ class TripManager:
                 conductor_name = loc.name
                 conductor_db_id = loc.conductor_db_id
 
-        # Find student session and send rate prompt
+        # Find student session, send rate prompt, and clear their location
         for sid, tid in list(self.active_trips.items()):
             if tid == trip_id and sid != conductor_session:
                 await self.conn.send_to(sid, {
@@ -371,10 +371,23 @@ class TripManager:
                     "conductor_id": conductor_db_id,
                     "conductor_name": conductor_name,
                 })
+                # Remove student location so they disappear from map and proximity count
+                if sid in self.conn.active:
+                    ws, _ = self.conn.active[sid]
+                    self.conn.active[sid] = (ws, None)
+                await self.conn.broadcast({"type": "remove", "id": sid})
                 del self.active_trips[sid]
                 break
 
         self.active_trips.pop(conductor_session, None)
+
+        # Recalculate conductor onboard count (student is now gone) and broadcast
+        if conductor_session in self.conn.active:
+            ws, conductor_loc = self.conn.active[conductor_session]
+            if conductor_loc:
+                updated = self.conn._update_conductor(conductor_loc)
+                self.conn.active[conductor_session] = (ws, updated)
+                await self.conn.broadcast({"type": "update", "user": updated.model_dump()})
 
     async def send_quick_message(self, conductor_session: str, trip_id: int, message_key: str):
         if message_key not in QUICK_MESSAGES:

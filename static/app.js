@@ -665,6 +665,10 @@ function handleMessage(msg) {
       break;
 
     case "rate_prompt":
+      activeTripId = null;
+      studentLocationEnabled = false;
+      document.getElementById("trip-bottom-sheet").classList.add("hidden");
+      document.getElementById("student-actions").classList.remove("hidden");
       showRatingModal(msg);
       break;
 
