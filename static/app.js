@@ -116,6 +116,7 @@ function stopBgPoll() {
 
 function pollBgUsers() {
   fetch("/usuarios/activos").then(r => r.json()).then(data => {
+    if (!_bgPollTimer) return;
     const activeIds = new Set((data.usuarios || []).map(u => u.id));
     Object.keys(_bgMarkers).forEach(id => {
       if (!activeIds.has(id)) { _bgMarkers[id].remove(); delete _bgMarkers[id]; }
