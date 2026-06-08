@@ -164,6 +164,8 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     await manager.send_to(session_id, {"type": "trip_restored", "trip_id": restored})
 
             elif msg_type == "trip_request":
+                if user.role != "estudiante":
+                    continue
                 zone = payload.get("zone_destination", "")
                 loc_data = manager.active.get(session_id, (None, None))[1]
                 if not loc_data:
@@ -186,17 +188,22 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     })
 
             elif msg_type == "trip_cancel":
-                await trip_manager.cancel_request(session_id)
+                if user.role == "estudiante":
+                    await trip_manager.cancel_request(session_id)
 
             elif msg_type == "trip_cancel_active":
                 await trip_manager.cancel_active_trip(session_id, db)
 
             elif msg_type == "trip_accept":
+                if user.role != "conductor":
+                    continue
                 request_id = payload.get("request_id")
                 if request_id:
                     await trip_manager.accept_request(session_id, request_id, db)
 
             elif msg_type == "trip_reject":
+                if user.role != "conductor":
+                    continue
                 request_id = payload.get("request_id")
                 if request_id:
                     await trip_manager.reject_request(session_id, request_id)
@@ -210,17 +217,23 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     await manager.broadcast({"type": "update", "user": updated.model_dump()})
 
             elif msg_type == "passenger_onboard":
+                if user.role != "conductor":
+                    continue
                 trip_id = payload.get("trip_id")
                 if trip_id:
                     await trip_manager.mark_onboard(session_id, int(trip_id), db)
 
             elif msg_type == "passenger_dropoff":
+                if user.role != "conductor":
+                    continue
                 trip_id = payload.get("trip_id")
                 student_db_id = payload.get("student_db_id", 0)
                 if trip_id:
                     await trip_manager.mark_dropoff(session_id, int(trip_id), int(student_db_id), db)
 
             elif msg_type == "quick_message":
+                if user.role != "conductor":
+                    continue
                 trip_id = payload.get("trip_id")
                 message_key = payload.get("message_key", "")
                 if trip_id and message_key:

@@ -204,14 +204,15 @@ class TripManager:
         await self._send_batch(req)
 
     async def accept_request(self, conductor_session: str, request_id: str, db) -> int | None:
-        if request_id not in self.pending:
+        # Pop immediately — prevents race condition when two batch conductors accept simultaneously
+        req = self.pending.pop(request_id, None)
+        if not req:
             await self.conn.send_to(conductor_session, {
                 "type": "trip_already_taken",
                 "request_id": request_id,
             })
             return None
-
-        req = self.pending[request_id]
+        self.by_student.pop(req.student_session, None)
 
         if req.timeout_task:
             req.timeout_task.cancel()
@@ -253,8 +254,6 @@ class TripManager:
                     "type": "trip_taken",
                     "request_id": request_id,
                 })
-
-        self._cleanup(request_id)
 
         # Query conductor vehicle info and rating
         vehicle_info = {}
@@ -385,10 +384,10 @@ class TripManager:
         if user_db_id in self.reconnect_tasks:
             self.reconnect_tasks[user_db_id].cancel()
         self.reconnect_tasks[user_db_id] = asyncio.create_task(
-            self._grace_expire(user_db_id, trip_id, other_sid, db)
+            self._grace_expire(user_db_id, trip_id, other_sid)
         )
 
-    async def _grace_expire(self, user_db_id: int, trip_id: int, other_sid: str | None, db):
+    async def _grace_expire(self, user_db_id: int, trip_id: int, other_sid: str | None):
         await asyncio.sleep(GRACE_PERIOD_S)
         if user_db_id not in self.user_to_trip:
             return  # Already reconnected
@@ -397,11 +396,16 @@ class TripManager:
         self.reconnect_tasks.pop(user_db_id, None)
         self.trip_parties.pop(trip_id, None)
 
-        from app.database import Trip
-        trip = db.query(Trip).filter(Trip.id == trip_id).first()
-        if trip and trip.status in ("accepted", "onboard"):
-            trip.status = "cancelled"
-            db.commit()
+        # Use a fresh DB session — the original WS session is already closed
+        from app.database import SessionLocal, Trip
+        _db = SessionLocal()
+        try:
+            trip = _db.query(Trip).filter(Trip.id == trip_id).first()
+            if trip and trip.status in ("accepted", "onboard"):
+                trip.status = "cancelled"
+                _db.commit()
+        finally:
+            _db.close()
 
         if other_sid:
             await self.conn.send_to(other_sid, {
@@ -444,6 +448,8 @@ class TripManager:
         return trip_id
 
     async def mark_onboard(self, conductor_session: str, trip_id: int, db):
+        if self.active_trips.get(conductor_session) != trip_id:
+            return
         from app.database import Trip, User
         trip = db.query(Trip).filter(Trip.id == trip_id).first()
         if trip:
@@ -459,6 +465,8 @@ class TripManager:
                 break
 
     async def mark_dropoff(self, conductor_session: str, trip_id: int, student_db_id: int, db):
+        if self.active_trips.get(conductor_session) != trip_id:
+            return
         from app.database import Trip, User
         trip = db.query(Trip).filter(Trip.id == trip_id).first()
         if trip:

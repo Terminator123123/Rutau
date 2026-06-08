@@ -7,7 +7,11 @@ from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db, User
 
-SECRET_KEY = os.getenv("SECRET_KEY", "colectivou-dev-secret-2026")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    import sys
+    print("[WARNING] SECRET_KEY no está configurada. Usando clave de desarrollo insegura. ¡Configura SECRET_KEY en producción!", file=sys.stderr)
+    SECRET_KEY = "colectivou-dev-secret-2026"
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 7
 COOKIE_NAME = "cu_session"

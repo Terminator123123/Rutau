@@ -26,6 +26,8 @@ router = APIRouter(tags=["Auth"])
 def register(body: RegisterRequest, background: BackgroundTasks, response: Response, db: Session = Depends(get_db)):
     if not body.terms_accepted:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debes aceptar los términos y condiciones")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña debe tener al menos 6 caracteres")
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ya registrado")
 

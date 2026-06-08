@@ -661,6 +661,13 @@ function handleMessage(msg) {
 
     case "trip_restored":
       activeTripId = msg.trip_id;
+      if (currentUser && currentUser.role === "estudiante") {
+        studentLocationEnabled = true;
+        document.getElementById("waiting-overlay").classList.add("hidden");
+        document.getElementById("student-actions").classList.add("hidden");
+        document.getElementById("trip-bottom-sheet").classList.remove("hidden");
+        document.getElementById("btn-cancel-active-trip").classList.remove("hidden");
+      }
       showToast("Reconectado — viaje activo restaurado.");
       break;
 
@@ -687,6 +694,7 @@ function handleMessage(msg) {
     case "rate_prompt":
       activeTripId = null;
       studentLocationEnabled = false;
+      showingNearby = false;
       document.getElementById("trip-bottom-sheet").classList.add("hidden");
       document.getElementById("student-actions").classList.remove("hidden");
       showRatingModal(msg);
@@ -702,8 +710,9 @@ function handleMessage(msg) {
 
 function requestRide() {
   if (!lastLat) { showToast("Espera a tener ubicación GPS."); return; }
-  if (activeRequestId) return;
+  if (activeRequestId || activeTripId) return;
 
+  activeRequestId = "pending";
   studentLocationEnabled = true;
   sendLocation(lastLat, lastLng);
 
@@ -724,6 +733,7 @@ function cancelRide() {
 }
 
 function resetStudentUI() {
+  showingNearby = false;
   document.getElementById("waiting-overlay").classList.add("hidden");
   document.getElementById("trip-bottom-sheet").classList.add("hidden");
   document.getElementById("student-actions").classList.remove("hidden");
