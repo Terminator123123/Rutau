@@ -23,6 +23,7 @@ let requestTimerInterval = null;
 // Map state
 let showingNearby = false;
 let studentLocationEnabled = false;
+let _myMarker = null;
 const markers        = {};
 const clusterMarkers = {};
 const _pendingConductors = {};
@@ -533,7 +534,11 @@ function requestLocation() {
   if (!navigator.geolocation) { setStatus("error", "GPS no disponible"); return; }
   setStatus("connecting", "Obteniendo ubicacion...");
   navigator.geolocation.getCurrentPosition(
-    pos => { connectWS(pos.coords.latitude, pos.coords.longitude); startWatching(); },
+    pos => {
+      updateMyMarker(pos.coords.latitude, pos.coords.longitude);
+      connectWS(pos.coords.latitude, pos.coords.longitude);
+      startWatching();
+    },
     ()  => setStatus("error", "Permiso de ubicacion denegado"),
     { enableHighAccuracy: true }
   );
@@ -541,10 +546,25 @@ function requestLocation() {
 
 function startWatching() {
   watchId = navigator.geolocation.watchPosition(
-    pos => { if (ws && ws.readyState === WebSocket.OPEN) sendLocation(pos.coords.latitude, pos.coords.longitude); },
+    pos => {
+      updateMyMarker(pos.coords.latitude, pos.coords.longitude);
+      if (ws && ws.readyState === WebSocket.OPEN) sendLocation(pos.coords.latitude, pos.coords.longitude);
+    },
     ()   => {},
     { enableHighAccuracy: true, maximumAge: 2000 }
   );
+}
+
+function updateMyMarker(lat, lng) {
+  if (!currentUser || currentUser.role !== "estudiante") return;
+  if (_myMarker) {
+    _myMarker.setLatLng([lat, lng]);
+  } else {
+    const icon = buildIcon({ role: "estudiante" }, true);
+    _myMarker = L.marker([lat, lng], { icon })
+      .addTo(map)
+      .bindPopup(`<div class="popup-name">${currentUser.name} (tú)</div>`);
+  }
 }
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
@@ -947,6 +967,7 @@ function elapsedTime(ts) {
 
 function addOrUpdateMarker(user) {
   const isMe = user.id === myId;
+  if (isMe && _myMarker) { _myMarker.remove(); _myMarker = null; }
   const isStudent = currentUser && currentUser.role === "estudiante";
   if (isStudent && !showingNearby && user.role === "conductor") {
     _pendingConductors[user.id] = user;
@@ -1136,6 +1157,7 @@ function cleanup() {
   myId = null; myDbId = null; lastLat = null; lastLng = null;
   manualPassengers = 0; activeRequestId = null; activeTripId = null;
   currentZone = ""; showingNearby = false; studentLocationEnabled = false;
+  if (_myMarker) { _myMarker.remove(); _myMarker = null; }
   Object.keys(_pendingConductors).forEach(k => delete _pendingConductors[k]);
 }
 
