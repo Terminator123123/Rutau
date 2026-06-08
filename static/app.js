@@ -722,7 +722,8 @@ function requestRide() {
   document.getElementById("student-actions").classList.add("hidden");
   document.getElementById("waiting-overlay").classList.remove("hidden");
 
-  sendWS({ type: "trip_request", zone_destination: "" });
+  const zone = document.getElementById("student-zone-select")?.value || "";
+  sendWS({ type: "trip_request", zone_destination: zone });
 
   // Zoom out animation while waiting
   map.flyTo([lastLat, lastLng], 13, { animate: true, duration: REQUEST_TIMEOUT_S });
@@ -954,11 +955,14 @@ function sendQuickMsg(tripId, key) {
 
 function populateZoneSelect(zones) {
   availableZones = zones;
-  const sel = document.getElementById("zone-select");
-  zones.forEach(z => {
-    const opt = document.createElement("option");
-    opt.value = z; opt.textContent = z;
-    sel.appendChild(opt);
+  ["zone-select", "student-zone-select"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    zones.forEach(z => {
+      const opt = document.createElement("option");
+      opt.value = z; opt.textContent = z;
+      sel.appendChild(opt);
+    });
   });
 }
 

@@ -6,13 +6,13 @@ import urllib.parse
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import COOKIE_NAME, INFO_COOKIE_NAME, TOKEN_EXPIRE_DAYS, create_token, hash_password
 from app.database import User, get_db
-from app.utils import _is_prod
+from app.utils import _is_prod, check_rate_limit
 
 router = APIRouter(tags=["Google Auth"])
 
@@ -40,17 +40,24 @@ async def google_login():
         "access_type":   "online",
         "prompt":        "select_account",
     })
-    return RedirectResponse(f"{_AUTH_URL}?{params}")
+    response = RedirectResponse(f"{_AUTH_URL}?{params}")
+    response.set_cookie("oauth_state", state, httponly=True, max_age=300, samesite="lax", secure=_is_prod)
+    return response
 
 
 @router.get("/auth/google/callback", include_in_schema=False)
 async def google_callback(
+    request: Request,
     code:  str = None,
     state: str = None,
     error: str = None,
     db:    Session = Depends(get_db),
 ):
-    if error or not code:
+    check_rate_limit(f"oauth:{request.client.host}", max_attempts=20, window_s=300)
+    stored_state = request.cookies.get("oauth_state")
+    if error or not code or not state or not stored_state:
+        return RedirectResponse("/dev?google_error=1")
+    if not secrets.compare_digest(state, stored_state):
         return RedirectResponse("/dev?google_error=1")
 
     async with httpx.AsyncClient() as client:
@@ -116,4 +123,5 @@ async def google_callback(
         key=INFO_COOKIE_NAME, value=_info,
         httponly=False, secure=_is_prod, samesite="lax", max_age=_max_age,
     )
+    response.delete_cookie("oauth_state")
     return response

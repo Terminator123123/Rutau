@@ -3,7 +3,7 @@ import time
 import urllib.parse
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
@@ -17,13 +17,14 @@ from app.models import (
     ForgotPasswordRequest, LoginRequest, RegisterRequest,
     ResetPasswordRequest, UserOut,
 )
-from app.utils import _user_out, _page, _is_prod
+from app.utils import _user_out, _page, _is_prod, check_rate_limit
 
 router = APIRouter(tags=["Auth"])
 
 
 @router.post("/register", response_model=UserOut)
-def register(body: RegisterRequest, background: BackgroundTasks, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, background: BackgroundTasks, response: Response, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(f"register:{request.client.host}", max_attempts=5, window_s=3600)
     if not body.terms_accepted:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debes aceptar los términos y condiciones")
     if len(body.password) < 6:
@@ -70,7 +71,8 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=UserOut)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(body: LoginRequest, response: Response, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(f"login:{request.client.host}", max_attempts=10, window_s=60)
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales incorrectas")
@@ -139,7 +141,8 @@ def update_me(body: dict, current_user: User = Depends(get_current_user), db: Se
 
 
 @router.post("/forgot-password")
-def forgot_password(body: ForgotPasswordRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
+def forgot_password(body: ForgotPasswordRequest, background: BackgroundTasks, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(f"forgot:{request.client.host}", max_attempts=5, window_s=3600)
     user = db.query(User).filter(User.email == body.email).first()
     if user and user.is_verified:
         token = generate_token()

@@ -565,6 +565,22 @@ html, body {
 .action-btn:hover { opacity: 0.88; transform: translateY(-1px); }
 .action-btn:active { transform: translateY(0); }
 
+.student-zone-select {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(7,11,18,0.8);
+  color: #cbd5e1;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  backdrop-filter: blur(12px);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.student-zone-select option { background: #0f172a; color: #f1f5f9; }
+
 /* ── Waiting overlay ──────────────────────────────────────────────────────── */
 #waiting-overlay {
   position: absolute;

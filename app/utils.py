@@ -1,7 +1,20 @@
 import os
+import time
+from collections import defaultdict
+from fastapi import HTTPException, Request
 
 from app.database import User
 from app.models import UserOut
+
+# ── Simple in-memory rate limiter ─────────────────────────────────────────────
+_rl_buckets: dict[str, list[float]] = defaultdict(list)
+
+def check_rate_limit(key: str, max_attempts: int = 10, window_s: int = 60):
+    now = time.time()
+    _rl_buckets[key] = [t for t in _rl_buckets[key] if now - t < window_s]
+    if len(_rl_buckets[key]) >= max_attempts:
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un momento e intenta de nuevo.")
+    _rl_buckets[key].append(now)
 
 _is_prod = os.getenv("DB_URL", "").startswith("postgresql")
 

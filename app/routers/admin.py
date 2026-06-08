@@ -143,12 +143,13 @@ def admin_registrar_recarga(
 
     conductor.saldo = (conductor.saldo or 0.0) + body.monto
 
+    admin_notes = f"[{admin.username}] {body.notas or ''}".strip()
     recarga = Recarga(
         conductor_id=user_id,
         admin_id=0,
         monto=body.monto,
         registrada_en=time.time(),
-        notas=body.notas,
+        notas=admin_notes,
     )
     db.add(recarga)
     db.commit()
