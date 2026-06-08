@@ -22,8 +22,10 @@ let requestTimerInterval = null;
 
 // Map state
 let showingNearby = false;
+let studentLocationEnabled = false;
 const markers        = {};
 const clusterMarkers = {};
+const _pendingConductors = {};
 let _bgMarkers = {};
 let _bgPollTimer = null;
 
@@ -562,6 +564,7 @@ function connectWS(lat, lng) {
 function sendLocation(lat, lng) {
   lastLat = lat; lastLng = lng;
   if (ws && ws.readyState === WebSocket.OPEN) {
+    if (currentUser && currentUser.role === "estudiante" && !studentLocationEnabled) return;
     ws.send(JSON.stringify({
       type: "location",
       lat, lng,
@@ -625,6 +628,7 @@ function handleMessage(msg) {
 
     case "dropoff_confirmed":
       activeTripId = null;
+      studentLocationEnabled = false;
       document.getElementById("conductor-approaching").classList.add("hidden");
       break;
 
@@ -644,6 +648,9 @@ function requestRide() {
   if (!lastLat) { showToast("Espera a tener ubicación GPS."); return; }
   if (activeRequestId) return;
 
+  studentLocationEnabled = true;
+  sendLocation(lastLat, lastLng);
+
   document.getElementById("student-actions").classList.add("hidden");
   document.getElementById("waiting-overlay").classList.remove("hidden");
 
@@ -654,6 +661,7 @@ function requestRide() {
 }
 
 function cancelRide() {
+  studentLocationEnabled = false;
   sendWS({ type: "trip_cancel" });
   activeRequestId = null;
   resetStudentUI();
@@ -684,6 +692,7 @@ function onTripAccepted(msg) {
 
 function onTripRejected(msg) {
   activeRequestId = null;
+  studentLocationEnabled = false;
   resetStudentUI();
   if (msg.reason === "no_conductors") {
     showToast("No hay conductores disponibles en este momento.");
@@ -692,8 +701,8 @@ function onTripRejected(msg) {
 
 function showNearby() {
   showingNearby = true;
-  showToast("Mostrando conductores cercanos. No apareces en el mapa.");
-  // Conductors are already shown via the normal WS broadcast
+  Object.values(_pendingConductors).forEach(u => addOrUpdateMarker(u));
+  showToast("Mostrando conductores cercanos.");
 }
 
 // ── Trip — conductor ───────────────────────────────────────────────────────
@@ -937,6 +946,11 @@ function elapsedTime(ts) {
 
 function addOrUpdateMarker(user) {
   const isMe = user.id === myId;
+  const isStudent = currentUser && currentUser.role === "estudiante";
+  if (isStudent && !showingNearby && user.role === "conductor") {
+    _pendingConductors[user.id] = user;
+    return;
+  }
   if (markers[user.id]) {
     markers[user.id].setLatLng([user.lat, user.lng]);
     markers[user.id].setIcon(buildIcon(user, isMe));
@@ -953,6 +967,7 @@ function addOrUpdateMarker(user) {
 
 function removeMarker(id) {
   if (markers[id]) { markers[id].remove(); delete markers[id]; }
+  delete _pendingConductors[id];
   refreshClusters();
 }
 
@@ -1119,7 +1134,8 @@ function cleanup() {
   Object.keys(clusterMarkers).forEach(k => delete clusterMarkers[k]);
   myId = null; myDbId = null; lastLat = null; lastLng = null;
   manualPassengers = 0; activeRequestId = null; activeTripId = null;
-  currentZone = ""; showingNearby = false;
+  currentZone = ""; showingNearby = false; studentLocationEnabled = false;
+  Object.keys(_pendingConductors).forEach(k => delete _pendingConductors[k]);
 }
 
 function openEditModal() {
