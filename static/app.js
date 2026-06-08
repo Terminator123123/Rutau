@@ -826,6 +826,21 @@ function showRequestModal(msg) {
   document.getElementById("request-distance").textContent     = msg.distance_m ? `A ${Math.round(msg.distance_m)} m` : "";
   document.getElementById("request-zone").textContent         = msg.zone_destination ? `Destino: ${msg.zone_destination}` : "";
 
+  const addrEl = document.getElementById("request-address");
+  addrEl.textContent = "Obteniendo dirección...";
+  if (msg.student?.lat && msg.student?.lng) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${msg.student.lat}&lon=${msg.student.lng}&zoom=17&accept-language=es`)
+      .then(r => r.json())
+      .then(data => {
+        const a = data.address || {};
+        const parts = [a.road, a.neighbourhood || a.suburb || a.village || a.town].filter(Boolean);
+        addrEl.textContent = parts.length ? parts.join(", ") : (data.display_name?.split(",")[0] || "");
+      })
+      .catch(() => { addrEl.textContent = ""; });
+  } else {
+    addrEl.textContent = "";
+  }
+
   document.getElementById("request-modal").classList.remove("hidden");
 
   // Animate timer bar

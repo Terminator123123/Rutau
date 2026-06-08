@@ -969,6 +969,7 @@ html, body {
 /* ── Request modal (conductor) ────────────────────────────────────────────── */
 .request-student  { font-size: 1rem; font-weight: 600; color: var(--text); text-align: center; margin-bottom: 0.3rem; }
 .request-distance { font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 0.15rem; }
+.request-address  { font-size: 0.75rem; color: var(--muted); text-align: center; margin-bottom: 0.15rem; font-style: italic; min-height: 1em; }
 .request-zone     { font-size: 0.8rem; color: var(--accent); text-align: center; margin-bottom: 1rem; font-weight: 500; }
 
 .request-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem; }
