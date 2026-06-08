@@ -204,8 +204,10 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.reset_token == body.token).first()
     if not user or not user.reset_token_expires or datetime.now(timezone.utc).timestamp() > user.reset_token_expires:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido o expirado")
-    user.hashed_password = hash_password(body.new_password)
+    # Invalidate token immediately before hashing to prevent parallel-request reuse
     user.reset_token = None
     user.reset_token_expires = None
+    db.commit()
+    user.hashed_password = hash_password(body.new_password)
     db.commit()
     return {"message": "Contraseña actualizada correctamente"}

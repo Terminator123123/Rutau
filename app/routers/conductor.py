@@ -48,6 +48,8 @@ async def upload_documents(
 ):
     if current_user.conductor_status == "approved":
         raise HTTPException(400, "Tu cuenta de conductor ya está aprobada")
+    if current_user.role not in ("estudiante", "conductor"):
+        raise HTTPException(403, "Rol no permitido")
 
     files = {"cedula": cedula, "selfie": selfie, "plate": plate, "soat": soat}
     paths = {}

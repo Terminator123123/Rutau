@@ -134,10 +134,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             payload = json.loads(data)
             msg_type = payload.get("type", "location")
 
-            if msg_type == "location" or msg_type not in (
-                "trip_request", "trip_cancel", "trip_cancel_active", "trip_accept", "trip_reject",
-                "zone_set", "passenger_onboard", "passenger_dropoff", "quick_message",
-            ):
+            if msg_type == "location":
                 update = LocationUpdate(**{k: v for k, v in payload.items() if k != "type"})
                 rating_avg = None
                 if user.role == "conductor" and user.rating_count:

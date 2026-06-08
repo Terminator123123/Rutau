@@ -572,6 +572,8 @@ function updateMyMarker(lat, lng) {
 // ── WebSocket ──────────────────────────────────────────────────────────────
 
 function connectWS(lat, lng) {
+  // Avoid creating a second connection if one is already open or connecting
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen    = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
@@ -579,6 +581,7 @@ function connectWS(lat, lng) {
   ws.onclose   = e  => {
     if (e.code === 4001) { showToast("Sesión expirada. Vuelve a iniciar sesión."); logout(); return; }
     if (e.code === 4003) { showToast("Cuenta no verificada."); logout(); return; }
+    if (!currentUser) return;  // Don't reconnect after logout
     setStatus("connecting", "Reconectando...");
     if (lastLat !== null) setTimeout(() => connectWS(lastLat, lastLng), 3000);
   };
@@ -1281,12 +1284,14 @@ function setStatus(state, text) {
 function cleanup() {
   if (watchId) navigator.geolocation.clearWatch(watchId);
   if (ws) ws.close();
+  clearTimeout(_requestTimerBar); _requestTimerBar = null;
   Object.values(markers).forEach(m => m.remove());
   Object.keys(markers).forEach(k => delete markers[k]);
   Object.values(clusterMarkers).forEach(m => m.remove());
   Object.keys(clusterMarkers).forEach(k => delete clusterMarkers[k]);
   myId = null; myDbId = null; lastLat = null; lastLng = null;
   manualPassengers = 0; activeRequestId = null; activeTripId = null;
+  pendingRatingTrip = null; _pendingRequestId = null;
   currentZone = ""; showingNearby = false; studentLocationEnabled = false;
   _pendingBoardingTrip = null;
   if (_myMarker) { _myMarker.remove(); _myMarker = null; }
