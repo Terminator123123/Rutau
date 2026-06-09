@@ -1393,54 +1393,43 @@ async function savePassword(e) {
 
 // ── Bottom sheet drag ──────────────────────────────────────────────────────
 
-(function initBottomSheetDrag() {
-  let startY = 0, currentY = 0, isDragging = false;
+function _initSheetDrag(handle) {
+  let startY = 0, curY = 0, dragging = false;
+  const sheet = handle.closest(".trip-sheet");
+  const bs    = handle.closest("#trip-bottom-sheet");
 
-  function getSheet() { return document.querySelector(".trip-sheet"); }
-
-  function onStart(e) {
-    const sheet = getSheet(); if (!sheet) return;
-    startY = e.touches ? e.touches[0].clientY : e.clientY;
-    currentY = 0;
-    isDragging = true;
+  function start(clientY) {
+    startY = clientY; curY = 0; dragging = true;
     sheet.style.transition = "none";
   }
-
-  function onMove(e) {
-    if (!isDragging) return;
-    const sheet = getSheet(); if (!sheet) return;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    currentY = Math.max(0, y - startY);
-    sheet.style.transform = `translateY(${currentY}px)`;
+  function move(clientY) {
+    if (!dragging) return;
+    curY = Math.max(0, clientY - startY);
+    sheet.style.transform = `translateY(${curY}px)`;
   }
-
-  function onEnd() {
-    if (!isDragging) return;
-    isDragging = false;
-    const sheet = getSheet(); if (!sheet) return;
-    sheet.style.transition = "";
-    if (currentY > 120) {
-      sheet.style.transform = "translateY(100%)";
-      setTimeout(() => {
-        sheet.style.transform = "";
-        const bs = document.getElementById("trip-bottom-sheet");
-        if (bs) bs.classList.add("hidden");
-      }, 280);
+  function end() {
+    if (!dragging) return;
+    dragging = false;
+    sheet.style.transition = "transform 0.28s cubic-bezier(0.22,1,0.36,1)";
+    if (curY > 110) {
+      sheet.style.transform = "translateY(110%)";
+      setTimeout(() => { sheet.style.transform = ""; bs.classList.add("hidden"); }, 290);
     } else {
       sheet.style.transform = "";
     }
   }
 
-  document.addEventListener("touchstart", e => {
-    if (e.target.closest(".trip-sheet")) onStart(e);
-  }, { passive: true });
-  document.addEventListener("touchmove", e => {
-    if (isDragging) onMove(e);
-  }, { passive: true });
-  document.addEventListener("touchend", onEnd);
-  document.addEventListener("mousedown", e => {
-    if (e.target.closest(".trip-sheet-handle")) onStart(e);
-  });
-  document.addEventListener("mousemove", e => { if (isDragging) onMove(e); });
-  document.addEventListener("mouseup", onEnd);
-})();
+  handle.addEventListener("touchstart",  e => { e.preventDefault(); start(e.touches[0].clientY); },  { passive: false });
+  handle.addEventListener("touchmove",   e => { e.preventDefault(); move(e.touches[0].clientY); },   { passive: false });
+  handle.addEventListener("touchend",    () => end());
+  handle.addEventListener("mousedown",   e => start(e.clientY));
+  document.addEventListener("mousemove", e => { if (dragging) move(e.clientY); });
+  document.addEventListener("mouseup",   () => end());
+}
+
+// Attach drag when the sheet becomes visible
+const _sheetObserver = new MutationObserver(() => {
+  const handle = document.querySelector("#trip-bottom-sheet:not(.hidden) .trip-sheet-handle");
+  if (handle && !handle._dragInit) { handle._dragInit = true; _initSheetDrag(handle); }
+});
+_sheetObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["class"] });
