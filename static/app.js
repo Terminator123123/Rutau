@@ -807,6 +807,7 @@ function markOnboardPending() {
   const { trip_id, studentName } = _pendingBoardingTrip;
   sendWS({ type: "passenger_onboard", trip_id: trip_id });
   addPassengerToPanel(trip_id, studentName);
+  addManual();
   document.getElementById("conductor-accepted-trip").classList.add("hidden");
   _pendingBoardingTrip = null;
 }
@@ -942,6 +943,7 @@ function markOnboard(tripId) {
 
 function markDropoff(tripId, studentDbId) {
   sendWS({ type: "passenger_dropoff", trip_id: tripId, student_db_id: studentDbId });
+  removeManual();
   const item = document.getElementById(`passenger-${tripId}`);
   if (item) item.remove();
   refreshPassengersEmpty();
@@ -1033,7 +1035,8 @@ function addManual() {
 }
 
 function removeManual() {
-  if (manualPassengers > 0) { manualPassengers--; if (lastLat !== null) sendLocation(lastLat, lastLng); }
+  const appOnboard = document.querySelectorAll("#passengers-list .passenger-item").length;
+  if (manualPassengers > appOnboard) { manualPassengers--; if (lastLat !== null) sendLocation(lastLat, lastLng); }
 }
 
 function updateCounterDisplay(total) {
@@ -1387,3 +1390,57 @@ async function savePassword(e) {
     msg.classList.remove("hidden");
   }
 }
+
+// ── Bottom sheet drag ──────────────────────────────────────────────────────
+
+(function initBottomSheetDrag() {
+  let startY = 0, currentY = 0, isDragging = false;
+
+  function getSheet() { return document.querySelector(".trip-sheet"); }
+
+  function onStart(e) {
+    const sheet = getSheet(); if (!sheet) return;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    currentY = 0;
+    isDragging = true;
+    sheet.style.transition = "none";
+  }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    const sheet = getSheet(); if (!sheet) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    currentY = Math.max(0, y - startY);
+    sheet.style.transform = `translateY(${currentY}px)`;
+  }
+
+  function onEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    const sheet = getSheet(); if (!sheet) return;
+    sheet.style.transition = "";
+    if (currentY > 120) {
+      sheet.style.transform = "translateY(100%)";
+      setTimeout(() => {
+        sheet.style.transform = "";
+        const bs = document.getElementById("trip-bottom-sheet");
+        if (bs) bs.classList.add("hidden");
+      }, 280);
+    } else {
+      sheet.style.transform = "";
+    }
+  }
+
+  document.addEventListener("touchstart", e => {
+    if (e.target.closest(".trip-sheet")) onStart(e);
+  }, { passive: true });
+  document.addEventListener("touchmove", e => {
+    if (isDragging) onMove(e);
+  }, { passive: true });
+  document.addEventListener("touchend", onEnd);
+  document.addEventListener("mousedown", e => {
+    if (e.target.closest(".trip-sheet-handle")) onStart(e);
+  });
+  document.addEventListener("mousemove", e => { if (isDragging) onMove(e); });
+  document.addEventListener("mouseup", onEnd);
+})();

@@ -774,7 +774,7 @@ html, body {
   position: absolute;
   top: calc(56px + 0.75rem);
   left: 0.75rem;
-  z-index: 1000;
+  z-index: 1100;
   width: 220px;
 }
 
@@ -815,7 +815,7 @@ html, body {
 /* ── Passengers panel (conductor) ─────────────────────────────────────────── */
 #passengers-panel {
   position: absolute;
-  top: calc(56px + 0.75rem);
+  top: calc(56px + 2.5rem);
   right: 0.75rem;
   z-index: 1000;
   width: 220px;
