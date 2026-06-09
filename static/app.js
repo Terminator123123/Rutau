@@ -980,9 +980,9 @@ function markOnboard(tripId) {
 
 function markDropoff(tripId, studentDbId) {
   sendWS({ type: "passenger_dropoff", trip_id: tripId, student_db_id: studentDbId });
-  removeManual();
   const item = document.getElementById(`passenger-${tripId}`);
   if (item) item.remove();
+  removeManual();
   refreshPassengersEmpty();
 }
 
@@ -1068,12 +1068,20 @@ function updateStatusButton() {
 }
 
 function addManual() {
-  if (manualPassengers < MAX_PASSENGERS) { manualPassengers++; if (lastLat !== null) sendLocation(lastLat, lastLng); }
+  if (manualPassengers < MAX_PASSENGERS) {
+    manualPassengers++;
+    updateCounterDisplay(manualPassengers);
+    if (lastLat !== null) sendLocation(lastLat, lastLng);
+  }
 }
 
 function removeManual() {
   const appOnboard = document.querySelectorAll("#passengers-list .passenger-item").length;
-  if (manualPassengers > appOnboard) { manualPassengers--; if (lastLat !== null) sendLocation(lastLat, lastLng); }
+  if (manualPassengers > appOnboard) {
+    manualPassengers--;
+    updateCounterDisplay(manualPassengers);
+    if (lastLat !== null) sendLocation(lastLat, lastLng);
+  }
 }
 
 function updateCounterDisplay(total) {
