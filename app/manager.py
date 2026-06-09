@@ -282,10 +282,11 @@ class TripManager:
             }
 
         await self.conn.send_to(req.student_session, {
-            "type":       "trip_accepted",
-            "request_id": request_id,
-            "trip_id":    trip.id,
-            "conductor":  conductor_info,
+            "type":                "trip_accepted",
+            "request_id":          request_id,
+            "trip_id":             trip.id,
+            "conductor":           conductor_info,
+            "conductor_session_id": conductor_session,
         })
 
         await self.conn.send_to(conductor_session, {

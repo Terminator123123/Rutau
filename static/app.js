@@ -15,11 +15,12 @@ let currentZone  = "";
 let availableZones = [];
 
 // Trip state
-let activeRequestId      = null;
-let activeTripId         = null;
-let pendingRatingTrip    = null;
-let requestTimerInterval = null;
-let _pendingBoardingTrip = null; // conductor: { trip_id, studentName }
+let activeRequestId        = null;
+let activeTripId           = null;
+let activeConductorId      = null; // session_id del conductor asignado al estudiante
+let pendingRatingTrip      = null;
+let requestTimerInterval   = null;
+let _pendingBoardingTrip   = null; // conductor: { trip_id, studentName }
 
 // Map state
 let showingNearby = false;
@@ -776,8 +777,9 @@ function resetStudentUI() {
 }
 
 function onTripAccepted(msg) {
-  activeRequestId = null;
-  activeTripId    = msg.trip_id;
+  activeRequestId   = null;
+  activeTripId      = msg.trip_id;
+  activeConductorId = msg.conductor_session_id || null;
 
   document.getElementById("waiting-overlay").classList.add("hidden");
 
@@ -815,7 +817,9 @@ function onTripAccepted(msg) {
   document.getElementById("btn-cancel-active-trip").classList.remove("hidden");
 
   document.getElementById("trip-bottom-sheet").classList.remove("hidden");
-  if (lastLat) map.flyTo([lastLat, lastLng], 16, { animate: true, duration: 1 });
+  const c = msg.conductor || {};
+  if (c.lat && c.lng) map.flyTo([c.lat, c.lng], 16, { animate: true, duration: 1 });
+  else if (lastLat) map.flyTo([lastLat, lastLng], 16, { animate: true, duration: 1 });
 }
 
 function onTripRejected(msg) {
@@ -848,6 +852,7 @@ function cancelActiveTrip() {
   if (currentUser && currentUser.role === "estudiante") {
     activeTripId = null;
     studentLocationEnabled = false;
+    if (activeConductorId) { removeMarker(activeConductorId); activeConductorId = null; }
     document.getElementById("trip-bottom-sheet").classList.add("hidden");
     document.getElementById("student-actions").classList.remove("hidden");
     if (lastLat) map.flyTo([lastLat, lastLng], 15, { animate: true, duration: 1.2 });
@@ -862,6 +867,7 @@ function onTripCancelledActive(msg) {
   activeTripId = null;
   if (currentUser && currentUser.role === "estudiante") {
     studentLocationEnabled = false;
+    if (activeConductorId) { removeMarker(activeConductorId); activeConductorId = null; }
     document.getElementById("trip-bottom-sheet").classList.add("hidden");
     document.getElementById("student-actions").classList.remove("hidden");
     if (lastLat) map.flyTo([lastLat, lastLng], 15, { animate: true, duration: 1.2 });
@@ -1086,11 +1092,15 @@ function markerColor(user) {
 
 function buildIcon(user, isMe) {
   if (user.role === "conductor") {
-    const size  = isMe ? 44 : 32;
-    const color = markerColor(user);
+    const isMyDriver = activeConductorId && user.id === activeConductorId;
+    const size  = isMe ? 44 : isMyDriver ? 40 : 32;
+    const color = isMyDriver ? "#f59e0b" : markerColor(user);
+    const pulse = isMyDriver
+      ? `box-shadow:0 0 0 6px rgba(245,158,11,0.25),0 0 0 12px rgba(245,158,11,0.1);border-radius:50%;padding:2px;`
+      : "";
     return L.divIcon({
       className: "",
-      html: `<div style="position:relative;width:${size}px;height:${size}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35))">
+      html: `<div style="position:relative;width:${size}px;height:${size}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));${pulse}">
         <svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${color}">
           <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
         </svg>
