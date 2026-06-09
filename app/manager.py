@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 from fastapi import WebSocket
 from app.models import UserLocation, QUICK_MESSAGES
 
-MAX_PASSENGERS   = 4
-ONBOARD_RADIUS_M = 50
+MAX_PASSENGERS = 4
 REQUEST_TIMEOUT_S = 40
 BATCH_SIZE       = 3
 GRACE_PERIOD_S   = 45
@@ -57,12 +56,7 @@ class ConnectionManager:
         return location
 
     def _update_conductor(self, conductor: UserLocation) -> UserLocation:
-        app_onboard = sum(
-            1 for _, loc in self.active.values()
-            if loc and loc.role == "estudiante"
-            and haversine(conductor.lat, conductor.lng, loc.lat, loc.lng) <= ONBOARD_RADIUS_M
-        )
-        total = app_onboard + conductor.manual_passengers
+        total = conductor.manual_passengers
         new_status = "lleno" if total >= MAX_PASSENGERS else conductor.status
         return conductor.model_copy(update={"onboard_count": total, "status": new_status})
 
