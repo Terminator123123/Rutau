@@ -538,8 +538,10 @@ function requestLocation() {
   setStatus("connecting", "Obteniendo ubicacion...");
   navigator.geolocation.getCurrentPosition(
     pos => {
-      updateMyMarker(pos.coords.latitude, pos.coords.longitude);
-      connectWS(pos.coords.latitude, pos.coords.longitude);
+      const { latitude: lat, longitude: lng } = pos.coords;
+      map.setView([lat, lng], 16);
+      updateMyMarker(lat, lng);
+      connectWS(lat, lng);
       startWatching();
     },
     ()  => setStatus("error", "Permiso de ubicacion denegado"),
