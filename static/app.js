@@ -729,11 +729,42 @@ function requestRide() {
   map.flyTo([lastLat, lastLng], 13, { animate: true, duration: REQUEST_TIMEOUT_S });
 }
 
+let _cancelCooldownTimer = null;
+
 function cancelRide() {
+  document.getElementById("cancel-reason-modal").classList.remove("hidden");
+}
+
+function closeCancelReasonModal() {
+  document.getElementById("cancel-reason-modal").classList.add("hidden");
+}
+
+function confirmCancelRide(reason) {
+  closeCancelReasonModal();
   studentLocationEnabled = false;
-  sendWS({ type: "trip_cancel" });
+  sendWS({ type: "trip_cancel", reason });
   activeRequestId = null;
   resetStudentUI();
+  _startCancelCooldown(30);
+}
+
+function _startCancelCooldown(seconds) {
+  const btn = document.querySelector("#student-actions .action-btn.primary");
+  if (!btn) return;
+  clearInterval(_cancelCooldownTimer);
+  let remaining = seconds;
+  btn.disabled = true;
+  btn.textContent = `Espera ${remaining}s`;
+  _cancelCooldownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(_cancelCooldownTimer);
+      btn.disabled = false;
+      btn.textContent = "Solicitar colectivo";
+    } else {
+      btn.textContent = `Espera ${remaining}s`;
+    }
+  }, 1000);
 }
 
 function resetStudentUI() {

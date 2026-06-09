@@ -362,6 +362,21 @@
   </div>
 </div>
 
+<!-- Modal motivo de cancelación (estudiante) -->
+<div id="cancel-reason-modal" class="modal-backdrop hidden">
+  <div class="modal-card" style="max-width:320px">
+    <h2 class="modal-title" style="font-size:1rem;margin-bottom:0.75rem">¿Por qué cancelas?</h2>
+    <div id="cancel-reason-options" class="cancel-reason-options">
+      <button class="cancel-reason-btn" onclick="confirmCancelRide('Cambié de opinión')">Cambié de opinión</button>
+      <button class="cancel-reason-btn" onclick="confirmCancelRide('Tardó demasiado')">Tardó demasiado</button>
+      <button class="cancel-reason-btn" onclick="confirmCancelRide('Encontré otro transporte')">Encontré otro transporte</button>
+      <button class="cancel-reason-btn" onclick="confirmCancelRide('El conductor no aparece')">El conductor no aparece</button>
+      <button class="cancel-reason-btn" onclick="confirmCancelRide('Otro motivo')">Otro motivo</button>
+    </div>
+    <button type="button" class="btn-link" style="margin-top:0.5rem" onclick="closeCancelReasonModal()">Volver</button>
+  </div>
+</div>
+
 <!-- Modal editar nombre -->
 <div id="edit-modal" class="modal-backdrop hidden">
   <div class="modal-card">

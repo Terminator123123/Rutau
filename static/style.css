@@ -1536,3 +1536,24 @@ html, body {
   border-color: rgba(220,38,38,0.45);
   box-shadow: 0 0 0 3px rgba(220,38,38,0.07);
 }
+
+/* ── Cancel reason modal ──────────────────────────────────────────────────── */
+.cancel-reason-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cancel-reason-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.88rem;
+  font-family: var(--font);
+  color: #1e293b;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cancel-reason-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
