@@ -23,4 +23,4 @@ def require_admin(credentials: HTTPBasicCredentials | None = Depends(_basic)):
     )
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Acceso denegado")
-    return credentials
+    return credentials.username
