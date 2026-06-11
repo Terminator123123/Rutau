@@ -873,7 +873,6 @@ function onTripAccepted(msg) {
   document.getElementById("btn-cancel-active-trip").classList.remove("hidden");
 
   document.getElementById("trip-bottom-sheet").classList.remove("hidden");
-  const c = msg.conductor || {};
   if (c.lat && c.lng) map.flyTo([c.lat, c.lng], 16, { animate: true, duration: 1 });
   else if (lastLat) map.flyTo([lastLat, lastLng], 16, { animate: true, duration: 1 });
 }
