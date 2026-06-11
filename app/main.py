@@ -77,6 +77,11 @@ async def dev():
     return FileResponse("static/dev.html")
 
 
+@app.get("/offline", include_in_schema=False)
+async def offline_page():
+    return FileResponse("static/offline.html")
+
+
 @app.get("/admin-panel", include_in_schema=False)
 async def admin_panel_page():
     return FileResponse("static/admin.html")
