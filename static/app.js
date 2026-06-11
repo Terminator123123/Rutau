@@ -87,7 +87,28 @@ async function installPWA() {
 window.addEventListener('appinstalled', () => {
   _deferredInstallPrompt = null;
   document.getElementById('pwa-install-banner')?.remove();
+  document.getElementById('dr-install')?.classList.add('hidden');
 });
+
+function _isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function installFromMenu() {
+  closeDrawer();
+  if (_isStandalone()) {
+    showToast("La app ya está instalada.");
+    return;
+  }
+  if (_deferredInstallPrompt) {
+    installPWA();
+    return;
+  }
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  showToast(isIOS
+    ? "En iPhone: toca Compartir y luego «Añadir a pantalla de inicio»."
+    : "En el menú del navegador (⋮) elige «Instalar aplicación» o «Añadir a pantalla de inicio».");
+}
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -96,6 +117,7 @@ window.addEventListener("DOMContentLoaded", () => {
     navigator.serviceWorker.register('/static/sw.js')
       .catch(err => console.warn('SW registration failed:', err));
   }
+  if (_isStandalone()) document.getElementById('dr-install')?.classList.add('hidden');
   initMap();
   startBgPoll();
   setupFormValidation();
