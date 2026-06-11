@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'colectivou-v3';
+const CACHE_VERSION = 'colectivou-v4';
 const STATIC_ASSETS = [
   '/dev',
   '/static/style.css',
@@ -7,8 +7,10 @@ const STATIC_ASSETS = [
   '/offline',
 ];
 
-// Static file extensions eligible for runtime caching
-const CACHEABLE_EXTENSIONS = ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.woff', '.woff2'];
+// Imágenes y fuentes: cache-first (pesados, cambian poco)
+const CACHE_FIRST_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.svg', '.ico', '.woff', '.woff2'];
+// Código: network-first (siempre fresco tras un deploy, cache solo como fallback offline)
+const NETWORK_FIRST_EXTENSIONS = ['.css', '.js'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -28,6 +30,35 @@ self.addEventListener('activate', event => {
   );
 });
 
+function networkFirst(request, htmlFallback) {
+  return fetch(request).then(response => {
+    if (response.ok && request.method === 'GET') {
+      const clone = response.clone();
+      caches.open(CACHE_VERSION).then(cache => cache.put(request, clone));
+    }
+    return response;
+  }).catch(err => {
+    return caches.match(request).then(cached => {
+      if (cached) return cached;
+      if (htmlFallback) return caches.match('/offline');
+      throw err;
+    });
+  });
+}
+
+function cacheFirst(request) {
+  return caches.match(request).then(cached => {
+    if (cached) return cached;
+    return fetch(request).then(response => {
+      if (response.ok && request.method === 'GET') {
+        const clone = response.clone();
+        caches.open(CACHE_VERSION).then(cache => cache.put(request, clone));
+      }
+      return response;
+    });
+  });
+}
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -39,26 +70,17 @@ self.addEventListener('fetch', event => {
   );
   if (isApi) return;
 
-  const isCacheable = CACHEABLE_EXTENSIONS.some(ext => url.pathname.endsWith(ext))
-    || url.pathname === '/dev'
-    || url.pathname === '/offline';
+  const isHtml = event.request.mode === 'navigate'
+    || event.request.headers.get('accept')?.includes('text/html');
+  const isCode = NETWORK_FIRST_EXTENSIONS.some(ext => url.pathname.endsWith(ext));
+  const isAsset = CACHE_FIRST_EXTENSIONS.some(ext => url.pathname.endsWith(ext));
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(event.request).then(response => {
-        if (response.ok && event.request.method === 'GET' && isCacheable) {
-          const clone = response.clone();
-          caches.open(CACHE_VERSION).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(err => {
-        if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/offline');
-        }
-        throw err;
-      });
-    })
-  );
+  if (isHtml) {
+    event.respondWith(networkFirst(event.request, true));
+  } else if (isCode) {
+    event.respondWith(networkFirst(event.request, false));
+  } else if (isAsset) {
+    event.respondWith(cacheFirst(event.request));
+  }
+  // Todo lo demás pasa directo a la red sin intervención del SW
 });
