@@ -4,18 +4,24 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --accent:  #2563eb;
-  --text:    #1e293b;
-  --muted:   #94a3b8;
-  --success: #16a34a;
-  --error:   #dc2626;
-  --font:    'Outfit', sans-serif;
+  --accent:      #0e7490;  /* azul mar Caribe */
+  --accent-warm: #f59e0b;  /* sol/arena Guajira */
+  --text:        #0f172a;
+  --muted:       #94a3b8;
+  --success:     #16a34a;
+  --error:       #dc2626;
+  --font:        'Outfit', sans-serif;
+  --shadow-1: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-2: 0 4px 14px rgba(15, 23, 42, 0.12);
+  --shadow-3: 0 12px 32px rgba(15, 23, 42, 0.18);
+  --radius-card:  12px;
+  --radius-input: 8px;
 }
 
 html, body {
   height: 100%;
   font-family: var(--font);
-  background: #f1f5f9;
+  background: #f8fafc;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -61,11 +67,11 @@ html, body {
   background: linear-gradient(160deg, #ffffff 0%, #f8faff 100%);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(37, 99, 235, 0.1);
-  border-top: 2px solid rgba(37, 99, 235, 0.22);
+  border: 1px solid rgba(14, 116, 144, 0.1);
+  border-top: 2px solid rgba(14, 116, 144, 0.22);
   border-radius: 16px;
   box-shadow:
-    0 24px 64px rgba(37, 99, 235, 0.1),
+    0 24px 64px rgba(14, 116, 144, 0.1),
     0 8px 24px rgba(0, 0, 0, 0.07),
     0 1px 0 rgba(255, 255, 255, 0.9) inset;
   animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -90,8 +96,8 @@ html, body {
 .brand-mark {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(37,99,235,0.18) 100%);
-  border: 1.5px solid rgba(37, 99, 235, 0.28);
+  background: linear-gradient(135deg, rgba(14,116,144,0.08) 0%, rgba(14,116,144,0.18) 100%);
+  border: 1.5px solid rgba(14, 116, 144, 0.28);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -99,7 +105,7 @@ html, body {
   font-size: 1.2rem;
   font-weight: 800;
   color: var(--accent);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.14);
+  box-shadow: 0 2px 10px rgba(14, 116, 144, 0.14);
 }
 
 .auth-brand h1 {
@@ -122,8 +128,8 @@ html, body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3px;
-  background: rgba(37, 99, 235, 0.06);
-  border: 1px solid rgba(37, 99, 235, 0.12);
+  background: rgba(14, 116, 144, 0.06);
+  border: 1px solid rgba(14, 116, 144, 0.12);
   border-radius: 9px;
   padding: 3px;
   margin-bottom: 1.5rem;
@@ -145,7 +151,7 @@ html, body {
 .tab.active {
   background: #fff;
   color: var(--accent);
-  box-shadow: 0 1px 6px rgba(37, 99, 235, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 6px rgba(14, 116, 144, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
   font-weight: 600;
 }
 
@@ -173,9 +179,9 @@ html, body {
 .auth-card input::placeholder { color: var(--muted); font-weight: 300; }
 
 .auth-card input:focus {
-  border-color: rgba(37, 99, 235, 0.4);
+  border-color: rgba(14, 116, 144, 0.4);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.08);
 }
 
 .auth-card input.invalid {
@@ -210,9 +216,9 @@ html, body {
 .modal-card input::placeholder { color: var(--muted); font-weight: 300; }
 
 .modal-card input:focus {
-  border-color: rgba(37, 99, 235, 0.4);
+  border-color: rgba(14, 116, 144, 0.4);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.08);
 }
 
 .modal-card input.invalid {
@@ -258,8 +264,8 @@ html, body {
 .role-opt:hover { color: var(--text); border-color: rgba(0,0,0,0.18); }
 
 .role-opt.active {
-  background: rgba(37, 99, 235, 0.06);
-  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(14, 116, 144, 0.06);
+  border-color: rgba(14, 116, 144, 0.35);
   color: var(--accent);
 }
 
@@ -268,7 +274,7 @@ html, body {
   width: 100%;
   padding: 0.8rem;
   margin-top: 0.25rem;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #0e7490 0%, #155e75 100%);
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -278,14 +284,14 @@ html, body {
   letter-spacing: 0.01em;
   cursor: pointer;
   transition: box-shadow 0.18s, transform 0.18s, opacity 0.18s;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 14px rgba(14, 116, 144, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.42), 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 20px rgba(14, 116, 144, 0.42), 0 2px 6px rgba(0, 0, 0, 0.1);
 }
-.btn-primary:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
+.btn-primary:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(14, 116, 144, 0.3); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .btn-link {
@@ -419,7 +425,7 @@ html, body {
   line-height: 1;
 }
 
-.btn-manual:hover { background: rgba(37,99,235,0.2); border-color: rgba(37,99,235,0.4); color: #93c5fd; }
+.btn-manual:hover { background: rgba(14,116,144,0.2); border-color: rgba(14,116,144,0.4); color: #93c5fd; }
 
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .dot.connecting { background: #fbbf24; animation: blink 1.2s infinite; }
@@ -552,7 +558,7 @@ html, body {
 .action-btn.primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+  box-shadow: 0 4px 16px rgba(14,116,144,0.4);
 }
 
 .action-btn.secondary {
@@ -740,7 +746,7 @@ html, body {
 
 .trip-pill.plate {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: #155e75;
   border-color: #bfdbfe;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -861,8 +867,8 @@ html, body {
 }
 
 .btn-paction.onboard {
-  background: rgba(37,99,235,0.1);
-  border-color: rgba(37,99,235,0.3);
+  background: rgba(14,116,144,0.1);
+  border-color: rgba(14,116,144,0.3);
   color: #93c5fd;
 }
 
@@ -1089,7 +1095,7 @@ html, body {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #0e7490;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1277,7 +1283,7 @@ html, body {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #0e7490;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1318,8 +1324,8 @@ html, body {
   letter-spacing: 0.1em;
   padding: 0.2rem 0.6rem;
   border-radius: 20px;
-  background: rgba(37,99,235,0.12);
-  border: 1px solid rgba(37,99,235,0.25);
+  background: rgba(14,116,144,0.12);
+  border: 1px solid rgba(14,116,144,0.25);
   color: #93c5fd;
 }
 
@@ -1527,9 +1533,9 @@ html, body {
 #onboarding-modal input::placeholder { color: var(--muted); font-weight: 300; }
 
 #onboarding-modal input:focus {
-  border-color: rgba(37,99,235,0.4);
+  border-color: rgba(14,116,144,0.4);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+  box-shadow: 0 0 0 3px rgba(14,116,144,0.08);
 }
 
 #onboarding-modal input.invalid {
@@ -1561,4 +1567,21 @@ html, body {
 @keyframes slideUp {
   from { opacity: 0; transform: translateX(-50%) translateY(20px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Saldo chip (topbar conductor) ───────────────────────────────────────── */
+.tb-saldo {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 2rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--success);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.tb-saldo.low {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #ea580c;
 }

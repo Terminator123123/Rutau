@@ -57,14 +57,14 @@ function _showInstallBanner() {
     banner.id = 'pwa-install-banner';
     banner.style.cssText = [
       'position:fixed', 'bottom:80px', 'left:50%', 'transform:translateX(-50%)',
-      'background:#2563eb', 'color:#fff', 'border-radius:1rem', 'padding:0.75rem 1.25rem',
-      'font-size:0.875rem', 'font-weight:600', 'box-shadow:0 4px 16px rgba(37,99,235,0.4)',
+      'background:#0e7490', 'color:#fff', 'border-radius:1rem', 'padding:0.75rem 1.25rem',
+      'font-size:0.875rem', 'font-weight:600', 'box-shadow:0 4px 16px rgba(14,116,144,0.4)',
       'display:flex', 'align-items:center', 'gap:0.75rem', 'z-index:9999',
       'animation:slideUp 0.3s ease',
     ].join(';');
     banner.innerHTML = `
       <span>📲 Instalar ColectivoU</span>
-      <button onclick="installPWA()" style="background:#fff;color:#2563eb;border:none;
+      <button onclick="installPWA()" style="background:#fff;color:#0e7490;border:none;
         border-radius:0.5rem;padding:0.35rem 0.75rem;font-weight:700;cursor:pointer;font-size:0.8rem;">
         Instalar
       </button>
@@ -496,6 +496,22 @@ function initMap() {
   }).addTo(map);
 }
 
+function refreshSaldo() {
+  if (currentUser?.role !== "conductor") return;
+  fetch("/conductor/saldo", { credentials: "include" })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data) return;
+      const chip = document.getElementById("tb-saldo");
+      const amount = document.getElementById("tb-saldo-amount");
+      if (!chip || !amount) return;
+      chip.classList.remove("hidden");
+      amount.textContent = `$${Math.round(data.saldo).toLocaleString("es-CO")}`;
+      chip.classList.toggle("low", data.saldo < 500);
+    })
+    .catch(() => {});
+}
+
 function startMap() {
   stopBgPoll();
   myDbId   = currentUser.id;
@@ -519,6 +535,7 @@ function startMap() {
       refreshPassengersEmpty();
       updateStatusButton();
       updateCounterDisplay(0);
+      refreshSaldo();
     } else if (!currentUser.conductor_status) {
       // Conductor nuevo — mostrar wizard después de la transición al mapa
       const authScreen = document.getElementById("auth-screen");
@@ -922,6 +939,7 @@ function markOnboardPending() {
   addManual();
   document.getElementById("conductor-accepted-trip").classList.add("hidden");
   _pendingBoardingTrip = null;
+  setTimeout(refreshSaldo, 1500);
 }
 
 function cancelActiveTrip() {
@@ -1053,6 +1071,7 @@ function closeRequestModal() {
 
 function markOnboard(tripId) {
   sendWS({ type: "passenger_onboard", trip_id: tripId });
+  setTimeout(refreshSaldo, 1500);
 }
 
 function markDropoff(tripId, studentDbId) {
@@ -1429,6 +1448,7 @@ function cleanup() {
   _pendingBoardingTrip = null;
   if (_myMarker) { _myMarker.remove(); _myMarker = null; }
   Object.keys(_pendingConductors).forEach(k => delete _pendingConductors[k]);
+  document.getElementById("tb-saldo")?.classList.add("hidden");
   startBgPoll();
 }
 

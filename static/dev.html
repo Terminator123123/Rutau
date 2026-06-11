@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#2563eb" />
+  <meta name="theme-color" content="#0e7490" />
   <meta name="description" content="Coordinación de transporte colectivo — Universidad de La Guajira" />
 
   <!-- iOS PWA -->
@@ -38,7 +38,11 @@
           <div id="tb-stars" class="tb-stars-row"></div>
         </div>
       </div>
-      <div class="tb-center"></div>
+      <div class="tb-center">
+        <div id="tb-saldo" class="tb-saldo hidden" title="Tu saldo actual">
+          <span id="tb-saldo-amount">$0</span>
+        </div>
+      </div>
       <div id="topbar-right">
         <span id="status-dot" class="dot connecting"></span>
         <span id="status-text">Conectando...</span>
