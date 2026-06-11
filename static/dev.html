@@ -185,6 +185,12 @@
       </svg>
       Instalar app
     </button>
+    <button class="dr-item" onclick="showQRModal(); closeDrawer()">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM17 13h2v2h-2zM21 13h-2v2h2zM13 17h2v2h-2zM17 17h2v2h-2zM21 17h-2v2h2zM13 21h2v-2h-2zM17 21h2v-2h-2zM21 21h-2v-2h2z"/>
+      </svg>
+      Compartir app (QR)
+    </button>
     <div class="dr-divider"></div>
 
     <button class="dr-item" onclick="logout()">
@@ -400,6 +406,20 @@
 </div>
 
 <!-- Modal editar nombre -->
+<!-- Modal QR / invitar -->
+<div id="qr-modal" class="modal-backdrop hidden">
+  <div class="modal-card" style="max-width:320px;text-align:center">
+    <h2 class="modal-title">Comparte ColectivoU</h2>
+    <p style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem">Escanea el código para abrir e instalar la app</p>
+    <div id="qr-canvas" style="display:flex;justify-content:center;padding:0.25rem 0 1rem"></div>
+    <div style="display:flex;gap:0.5rem;align-items:center">
+      <input type="text" id="qr-link" readonly style="margin:0;flex:1;font-size:0.78rem" />
+      <button class="btn-primary" style="width:auto;padding:0.6rem 0.9rem;margin:0;font-size:0.8rem" onclick="copyInviteLink()">Copiar</button>
+    </div>
+    <button type="button" class="btn-link" onclick="closeQRModal()">Cerrar</button>
+  </div>
+</div>
+
 <div id="edit-modal" class="modal-backdrop hidden">
   <div class="modal-card">
     <h2 class="modal-title">Editar nombre</h2>
@@ -495,6 +515,7 @@
 </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

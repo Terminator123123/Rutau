@@ -1,6 +1,7 @@
 import asyncio
 import json
 import math
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -12,6 +13,15 @@ REQUEST_TIMEOUT_S = 40
 BATCH_SIZE       = 3
 GRACE_PERIOD_S   = 45
 OFFER_TIMEOUT_S  = 15   # tiempo del estudiante para aceptar/rechazar la oferta de un conductor
+
+# Cobro por abordaje (COP). 0 = cobro desactivado (modo expo / lanzamiento).
+# Para activar: variable de entorno TRIP_FEE_COP=100 en Railway.
+TRIP_FEE_COP = float(os.getenv("TRIP_FEE_COP", "0"))
+
+# Verificación GPS de abordaje: tras marcar "a bordo" se espera y se compara
+# UNA sola vez la ubicación del conductor con la del estudiante.
+ONBOARD_VERIFY_DELAY_S  = 20
+ONBOARD_VERIFY_RADIUS_M = 15
 
 
 def haversine(lat1, lng1, lat2, lng2) -> float:
@@ -129,6 +139,7 @@ class TripManager:
         self.user_to_trip: dict[int, int] = {}          # user_db_id → trip_id
         self.trip_parties: dict[int, dict] = {}         # trip_id → party sessions/ids
         self.reconnect_tasks: dict[int, asyncio.Task] = {}
+        self.onboard_checks: dict[int, asyncio.Task] = {}  # trip_id → verificación GPS en curso
 
     async def create_request(self, student_session: str, student_db_id: int,
                               student_name: str, lat: float, lng: float,
@@ -137,7 +148,8 @@ class TripManager:
 
         candidates_raw = self.conn.get_approved_conductors_sorted(lat, lng)
         candidate_map = {sid: loc for sid, loc in candidates_raw if loc.conductor_db_id is not None}
-        if candidate_map:
+        if candidate_map and TRIP_FEE_COP > 0:
+            # Con cobro activo solo participan conductores con saldo positivo
             from app.database import User
             db_ids = [loc.conductor_db_id for loc in candidate_map.values()]
             solvent_ids = {
@@ -147,7 +159,7 @@ class TripManager:
             }
             candidates = [sid for sid, loc in candidate_map.items() if loc.conductor_db_id in solvent_ids]
         else:
-            candidates = []
+            candidates = list(candidate_map.keys())
 
         if not candidates:
             return None
@@ -569,19 +581,68 @@ class TripManager:
     async def mark_onboard(self, conductor_session: str, trip_id: int, db):
         if self.active_trips.get(conductor_session) != trip_id:
             return
-        from app.database import Trip, User
-        trip = db.query(Trip).filter(Trip.id == trip_id).first()
-        if trip:
-            trip.status = "onboard"
-            trip.onboard_at = time.time()
-            conductor = db.query(User).filter(User.id == trip.conductor_id).first()
-            if conductor:
-                conductor.saldo = (conductor.saldo or 0.0) - 100
-            db.commit()
-        for sid, tid in self.active_trips.items():
-            if tid == trip_id and sid != conductor_session:
-                await self.conn.send_to(sid, {"type": "onboard_confirmed", "trip_id": trip_id})
-                break
+        # La verificación corre una sola vez por viaje (evita spam al servidor)
+        if trip_id in self.onboard_checks:
+            return
+        task = asyncio.create_task(self._verify_onboard(trip_id, conductor_session))
+        self.onboard_checks[trip_id] = task
+
+    async def _verify_onboard(self, trip_id: int, conductor_session: str):
+        """Espera ONBOARD_VERIFY_DELAY_S y compara una vez la ubicación del
+        conductor con la del estudiante. El abordaje (y el cobro, si está
+        activo) solo se confirma si ambos están a <= ONBOARD_VERIFY_RADIUS_M."""
+        try:
+            await asyncio.sleep(ONBOARD_VERIFY_DELAY_S)
+
+            parties = self.trip_parties.get(trip_id, {})
+            student_sid = parties.get("student_sid")
+
+            conductor_loc = None
+            student_loc = None
+            if conductor_session in self.conn.active:
+                _, conductor_loc = self.conn.active[conductor_session]
+            if student_sid and student_sid in self.conn.active:
+                _, student_loc = self.conn.active[student_sid]
+
+            dist_m = None
+            if conductor_loc and student_loc:
+                dist_m = haversine(conductor_loc.lat, conductor_loc.lng,
+                                   student_loc.lat, student_loc.lng)
+
+            if dist_m is None or dist_m > ONBOARD_VERIFY_RADIUS_M:
+                await self.conn.send_to(conductor_session, {
+                    "type":       "onboard_failed",
+                    "trip_id":    trip_id,
+                    "distance_m": int(dist_m) if dist_m is not None else None,
+                })
+                return
+
+            # Verificación OK → marcar a bordo y cobrar (si el cobro está activo)
+            from app.database import SessionLocal, Trip, User
+            _db = SessionLocal()
+            try:
+                trip = _db.query(Trip).filter(Trip.id == trip_id).first()
+                if not trip:
+                    return
+                trip.status = "onboard"
+                trip.onboard_at = time.time()
+                if TRIP_FEE_COP > 0:
+                    conductor = _db.query(User).filter(User.id == trip.conductor_id).first()
+                    if conductor:
+                        conductor.saldo = (conductor.saldo or 0.0) - TRIP_FEE_COP
+                _db.commit()
+            finally:
+                _db.close()
+
+            if student_sid:
+                await self.conn.send_to(student_sid, {"type": "onboard_confirmed", "trip_id": trip_id})
+            await self.conn.send_to(conductor_session, {
+                "type":    "onboard_verified",
+                "trip_id": trip_id,
+                "charged": TRIP_FEE_COP if TRIP_FEE_COP > 0 else 0,
+            })
+        finally:
+            self.onboard_checks.pop(trip_id, None)
 
     async def mark_dropoff(self, conductor_session: str, trip_id: int, student_db_id: int, db):
         if self.active_trips.get(conductor_session) != trip_id:

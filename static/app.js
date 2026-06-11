@@ -51,7 +51,9 @@ let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;
-  if (currentUser) _showInstallBanner();
+  // El navegador solo dispara este evento si la app NO está instalada,
+  // así que mostrar el banner aquí ya corrobora la instalación.
+  _showInstallBanner();
 });
 
 function _showInstallBanner() {
@@ -97,6 +99,39 @@ window.addEventListener('appinstalled', () => {
 
 function _isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+// ── Compartir app (QR + link) ───────────────────────────────────────────────
+let _qrRendered = false;
+
+function showQRModal() {
+  const link = location.origin + "/dev";
+  document.getElementById("qr-link").value = link;
+  if (!_qrRendered && window.QRCode) {
+    new QRCode(document.getElementById("qr-canvas"), {
+      text: link, width: 220, height: 220,
+      colorDark: "#0e7490", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+    _qrRendered = true;
+  }
+  document.getElementById("qr-modal").classList.remove("hidden");
+}
+
+function closeQRModal() {
+  document.getElementById("qr-modal").classList.add("hidden");
+}
+
+function copyInviteLink() {
+  const inp = document.getElementById("qr-link");
+  const done = () => showToast("Enlace copiado ✓");
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(inp.value).then(done).catch(() => {
+      inp.select(); document.execCommand("copy"); done();
+    });
+  } else {
+    inp.select(); document.execCommand("copy"); done();
+  }
 }
 
 function installFromMenu() {
@@ -810,6 +845,23 @@ function handleMessage(msg) {
       showToast("La otra persona se reconectó.");
       break;
 
+    case "onboard_verified": {
+      const msgCharge = msg.charged > 0 ? ` (cobro: $${msg.charged})` : "";
+      showToast(`Pasajero verificado a bordo ✓${msgCharge}`);
+      refreshSaldo();
+      break;
+    }
+
+    case "onboard_failed": {
+      const distTxt = msg.distance_m != null ? ` Está a ${msg.distance_m} m.` : "";
+      showToast(`No se pudo verificar que el estudiante esté en el carro.${distTxt}`);
+      const item = document.getElementById(`passenger-${msg.trip_id}`);
+      if (item) item.remove();
+      removeManual();
+      refreshPassengersEmpty();
+      break;
+    }
+
     case "onboard_confirmed":
       activeTripId = msg.trip_id;
       document.getElementById("btn-cancel-active-trip").classList.add("hidden");
@@ -1002,6 +1054,18 @@ function onTripAccepted(msg) {
 
   const c = msg.conductor || {};
 
+  // Mostrar el marker del conductor asignado de inmediato (estaba retenido en pending)
+  if (activeConductorId && _pendingConductors[activeConductorId]) {
+    addOrUpdateMarker(_pendingConductors[activeConductorId]);
+    delete _pendingConductors[activeConductorId];
+  } else if (activeConductorId && c.lat && c.lng) {
+    addOrUpdateMarker({
+      id: activeConductorId, lat: c.lat, lng: c.lng, role: "conductor",
+      name: c.name || "Conductor", connected_at: Date.now() / 1000,
+      zone_destination: c.zone || null, rating_avg: c.rating || null,
+    });
+  }
+
   // Foto de perfil del conductor
   const tripPhoto = document.getElementById("trip-conductor-photo");
   if (c.foto) { tripPhoto.src = c.foto; tripPhoto.classList.remove("hidden"); }
@@ -1066,7 +1130,7 @@ function markOnboardPending() {
   addManual();
   document.getElementById("conductor-accepted-trip").classList.add("hidden");
   _pendingBoardingTrip = null;
-  setTimeout(refreshSaldo, 1500);
+  showToast("Verificando abordaje por GPS (20 s)…");
 }
 
 function cancelActiveTrip() {
@@ -1198,7 +1262,7 @@ function closeRequestModal() {
 
 function markOnboard(tripId) {
   sendWS({ type: "passenger_onboard", trip_id: tripId });
-  setTimeout(refreshSaldo, 1500);
+  showToast("Verificando abordaje por GPS (20 s)…");
 }
 
 function markDropoff(tripId, studentDbId) {
@@ -1384,7 +1448,9 @@ function addOrUpdateMarker(user) {
   const isStudent = currentUser && currentUser.role === "estudiante";
   // Un estudiante nunca debe ver a otro estudiante (defensa extra al filtro del servidor)
   if (isStudent && user.role === "estudiante" && !isMe) return;
-  if (isStudent && !showingNearby && user.role === "conductor") {
+  // El conductor asignado a mi viaje SIEMPRE se muestra (para saber cuándo llega)
+  const isMyDriver = activeConductorId && user.id === activeConductorId;
+  if (isStudent && !showingNearby && user.role === "conductor" && !isMyDriver) {
     _pendingConductors[user.id] = user;
     return;
   }
