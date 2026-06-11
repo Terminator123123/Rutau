@@ -100,3 +100,18 @@ def conductor_status(current_user: User = Depends(get_current_user)):
         "conductor_status": current_user.conductor_status,
         "has_documents": bool(current_user.cedula_path),
     }
+
+
+@router.get("/conductores/{user_id}/foto")
+def conductor_foto(user_id: int, current_user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    """Foto de perfil del conductor (selfie de verificación). Requiere sesión activa."""
+    from fastapi.responses import FileResponse
+    conductor = db.query(User).filter(
+        User.id == user_id,
+        User.role == "conductor",
+        User.conductor_status == "approved",
+    ).first()
+    if not conductor or not conductor.selfie_path or not os.path.exists(conductor.selfie_path):
+        raise HTTPException(404, "Foto no disponible")
+    return FileResponse(conductor.selfie_path)

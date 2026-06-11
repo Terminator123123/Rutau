@@ -22,6 +22,11 @@ let pendingRatingTrip      = null;
 let requestTimerInterval   = null;
 let _pendingBoardingTrip   = null; // conductor: { trip_id, studentName }
 
+// Offer state (estudiante elige conductor)
+let _offerQueue   = [];   // ofertas en espera de mostrarse
+let _currentOffer = null; // { request_id, conductor_session_id, conductor, timeout_s }
+let _offerTimer   = null; // timeout que auto-descarta la oferta visible
+
 // Map state
 let showingNearby = false;
 let studentLocationEnabled = false;
@@ -732,11 +737,37 @@ function handleMessage(msg) {
       showRequestModal(msg);
       break;
 
+    case "conductor_offer":
+      onConductorOffer(msg);
+      break;
+
+    case "offer_waiting":
+      document.getElementById("offer-waiting-banner").classList.remove("hidden");
+      break;
+
+    case "offer_declined": {
+      document.getElementById("offer-waiting-banner").classList.add("hidden");
+      const reasons = {
+        timeout:             "El estudiante no respondió a tiempo.",
+        rejected:            "El estudiante rechazó tu oferta.",
+        student_chose_other: "El estudiante eligió otro conductor.",
+      };
+      showToast(reasons[msg.reason] || "La oferta no fue aceptada.");
+      break;
+    }
+
+    case "offer_expired":
+      hideOfferCard();
+      showToast("Esa oferta ya expiró.");
+      showNextOffer();
+      break;
+
     case "trip_accepted":
       onTripAccepted(msg);
       break;
 
     case "trip_accept_confirmed":
+      document.getElementById("offer-waiting-banner").classList.add("hidden");
       onTripAcceptConfirmed(msg);
       break;
 
@@ -746,6 +777,7 @@ function handleMessage(msg) {
 
     case "trip_cancelled":
       closeRequestModal();
+      document.getElementById("offer-waiting-banner").classList.add("hidden");
       break;
 
     case "trip_cancelled_active":
@@ -755,7 +787,7 @@ function handleMessage(msg) {
     case "trip_taken":
     case "trip_already_taken":
       closeRequestModal();
-      showToast("Otro conductor aceptó este viaje primero.");
+      showToast("El viaje ya fue tomado.");
       break;
 
     case "trip_restored":
@@ -865,10 +897,99 @@ function _startCancelCooldown(seconds) {
 
 function resetStudentUI() {
   showingNearby = false;
+  clearOffers();
   document.getElementById("waiting-overlay").classList.add("hidden");
   document.getElementById("trip-bottom-sheet").classList.add("hidden");
   document.getElementById("student-actions").classList.remove("hidden");
   if (lastLat) map.flyTo([lastLat, lastLng], 15, { animate: true, duration: 1.2 });
+}
+
+// ── Ofertas de conductores (el estudiante elige) ───────────────────────────
+
+function onConductorOffer(msg) {
+  _offerQueue.push(msg);
+  if (!_currentOffer) showNextOffer();
+}
+
+function showNextOffer() {
+  if (_currentOffer || !_offerQueue.length) return;
+  const offer = _offerQueue.shift();
+  _currentOffer = offer;
+  const c = offer.conductor || {};
+
+  document.getElementById("offer-name").textContent = c.name || "Conductor";
+  document.getElementById("offer-stars").innerHTML =
+    (c.rating != null && c.rating_count)
+      ? renderStarRow(c.rating, c.rating_count, "0.78rem")
+      : (c.rating != null ? `<span style="color:#f59e0b">★ ${c.rating}</span>` : "");
+
+  const plateEl = document.getElementById("offer-plate");
+  const colorEl = document.getElementById("offer-color");
+  const modelEl = document.getElementById("offer-model");
+  plateEl.textContent = c.placa  || ""; plateEl.classList.toggle("hidden", !c.placa);
+  colorEl.textContent = c.color  || ""; colorEl.classList.toggle("hidden", !c.color);
+  modelEl.textContent = c.modelo || ""; modelEl.classList.toggle("hidden", !c.modelo);
+
+  const etaEl = document.getElementById("offer-eta");
+  etaEl.textContent = c.eta_seconds != null
+    ? `Llega en ~${Math.max(1, Math.round(c.eta_seconds / 60))} min`
+    : "";
+
+  const photo = document.getElementById("offer-photo");
+  if (c.foto) { photo.src = c.foto; photo.classList.remove("hidden"); }
+  else { photo.classList.add("hidden"); photo.removeAttribute("src"); }
+
+  document.getElementById("offer-card").classList.remove("hidden");
+
+  // Barra de tiempo (15 s)
+  const timeoutS = offer.timeout_s || 15;
+  const bar = document.getElementById("offer-timer-bar");
+  bar.style.transition = "none";
+  bar.style.width = "100%";
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    bar.style.transition = `width ${timeoutS}s linear`;
+    bar.style.width = "0%";
+  }));
+
+  clearTimeout(_offerTimer);
+  _offerTimer = setTimeout(() => {
+    hideOfferCard();
+    showNextOffer();
+  }, timeoutS * 1000);
+}
+
+function hideOfferCard() {
+  clearTimeout(_offerTimer); _offerTimer = null;
+  _currentOffer = null;
+  document.getElementById("offer-card").classList.add("hidden");
+}
+
+function clearOffers() {
+  _offerQueue = [];
+  hideOfferCard();
+}
+
+function acceptOffer() {
+  if (!_currentOffer) return;
+  sendWS({
+    type: "offer_accept",
+    request_id: _currentOffer.request_id,
+    conductor_session_id: _currentOffer.conductor_session_id,
+  });
+  hideOfferCard();
+  // Las demás ofertas las descarta el servidor (offer_declined a cada conductor)
+  _offerQueue = [];
+}
+
+function rejectOffer() {
+  if (!_currentOffer) return;
+  sendWS({
+    type: "offer_reject",
+    request_id: _currentOffer.request_id,
+    conductor_session_id: _currentOffer.conductor_session_id,
+  });
+  hideOfferCard();
+  showNextOffer();
 }
 
 function onTripAccepted(msg) {
@@ -876,9 +997,15 @@ function onTripAccepted(msg) {
   activeTripId      = msg.trip_id;
   activeConductorId = msg.conductor_session_id || null;
 
+  clearOffers();
   document.getElementById("waiting-overlay").classList.add("hidden");
 
   const c = msg.conductor || {};
+
+  // Foto de perfil del conductor
+  const tripPhoto = document.getElementById("trip-conductor-photo");
+  if (c.foto) { tripPhoto.src = c.foto; tripPhoto.classList.remove("hidden"); }
+  else { tripPhoto.classList.add("hidden"); tripPhoto.removeAttribute("src"); }
 
   // Conductor info
   document.getElementById("trip-conductor-name").textContent = c.name || "Conductor";
@@ -1451,6 +1578,8 @@ function cleanup() {
   if (_myMarker) { _myMarker.remove(); _myMarker = null; }
   Object.keys(_pendingConductors).forEach(k => delete _pendingConductors[k]);
   document.getElementById("tb-saldo")?.classList.add("hidden");
+  clearOffers();
+  document.getElementById("offer-waiting-banner")?.classList.add("hidden");
   startBgPoll();
 }
 

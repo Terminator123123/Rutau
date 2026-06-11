@@ -1585,3 +1585,146 @@ html, body {
   border-color: #fed7aa;
   color: #ea580c;
 }
+
+/* ── Oferta de conductor (estudiante decide) ─────────────────────────────── */
+#offer-card {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 1.5rem));
+  z-index: 1300;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 64px);
+  animation: offerDown 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes offerDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.offer-inner {
+  background: #fff;
+  border-radius: var(--radius-card, 12px);
+  box-shadow: var(--shadow-3, 0 12px 32px rgba(15,23,42,0.18));
+  border: 1px solid rgba(14, 116, 144, 0.15);
+  overflow: hidden;
+}
+
+.offer-timer {
+  height: 4px;
+  background: #e2e8f0;
+}
+#offer-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+}
+
+.offer-title {
+  padding: 0.75rem 1rem 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.offer-body {
+  display: flex;
+  gap: 0.85rem;
+  padding: 0.6rem 1rem 0.75rem;
+  align-items: flex-start;
+}
+
+.offer-avatar {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #155e75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.offer-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.offer-name { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.offer-stars { font-size: 0.78rem; margin: 0.1rem 0 0.35rem; }
+.offer-pills { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.offer-eta { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+.offer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0 1rem 0.9rem;
+}
+
+.offer-btn {
+  padding: 0.65rem;
+  border-radius: 9px;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.offer-btn:active { transform: scale(0.97); }
+.offer-btn.accept {
+  background: linear-gradient(135deg, #0e7490 0%, #155e75 100%);
+  border: none;
+  color: #fff;
+}
+.offer-btn.reject {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  color: #64748b;
+}
+
+/* Banner conductor: esperando confirmación */
+#offer-waiting-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+}
+.ow-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  border-radius: 2rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+  box-shadow: var(--shadow-2, 0 4px 14px rgba(15,23,42,0.12));
+}
+.ow-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(14, 116, 144, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: owSpin 0.8s linear infinite;
+}
+@keyframes owSpin { to { transform: rotate(360deg); } }
+
+/* Foto del conductor en el trip sheet */
+.trip-conductor-avatar { position: relative; overflow: hidden; }
+.trip-conductor-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

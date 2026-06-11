@@ -215,6 +215,22 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                 if request_id:
                     await trip_manager.accept_request(session_id, request_id, db)
 
+            elif msg_type == "offer_accept":
+                if user.role != "estudiante":
+                    continue
+                request_id = payload.get("request_id")
+                conductor_session = payload.get("conductor_session_id")
+                if request_id and conductor_session:
+                    await trip_manager.confirm_offer(session_id, request_id, conductor_session, db)
+
+            elif msg_type == "offer_reject":
+                if user.role != "estudiante":
+                    continue
+                request_id = payload.get("request_id")
+                conductor_session = payload.get("conductor_session_id")
+                if request_id and conductor_session:
+                    await trip_manager.reject_offer(session_id, request_id, conductor_session)
+
             elif msg_type == "trip_reject":
                 if user.role != "conductor":
                     continue

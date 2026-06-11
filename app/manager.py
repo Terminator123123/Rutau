@@ -11,6 +11,7 @@ MAX_PASSENGERS = 4
 REQUEST_TIMEOUT_S = 40
 BATCH_SIZE       = 3
 GRACE_PERIOD_S   = 45
+OFFER_TIMEOUT_S  = 15   # tiempo del estudiante para aceptar/rechazar la oferta de un conductor
 
 
 def haversine(lat1, lng1, lat2, lng2) -> float:
@@ -36,6 +37,7 @@ class TripRequest:
     notified:         set  = field(default_factory=set)   # currently notified batch
     batch_start:      int  = 0                             # next unsent index in candidates
     timeout_task:     object = field(default=None, repr=False)
+    offers:           dict = field(default_factory=dict)  # conductor_session → {"task": Task, "info": dict, "db_id": int}
 
 
 class ConnectionManager:
@@ -209,32 +211,167 @@ class TripManager:
 
     async def _timeout(self, request_id: str):
         await asyncio.sleep(REQUEST_TIMEOUT_S)
-        if request_id not in self.pending:
+        req = self.pending.get(request_id)
+        if not req:
             return
-        req = self.pending[request_id]
+        # No expirar el lote mientras el estudiante tiene ofertas en pantalla
+        while req.offers:
+            await asyncio.sleep(5)
+            req = self.pending.get(request_id)
+            if not req:
+                return
         req.notified = set()
         await self._send_batch(req)
 
-    async def accept_request(self, conductor_session: str, request_id: str, db) -> int | None:
-        # Pop immediately — prevents race condition when two batch conductors accept simultaneously
-        req = self.pending.pop(request_id, None)
-        if not req:
-            await self.conn.send_to(conductor_session, {
-                "type": "trip_already_taken",
-                "request_id": request_id,
-            })
-            return None
-        self.by_student.pop(req.student_session, None)
-
-        if req.timeout_task:
-            req.timeout_task.cancel()
-
+    def _build_conductor_info(self, conductor_session: str, req: TripRequest, db) -> tuple[dict, int | None]:
+        """Arma la información completa del conductor (vehículo, rating, foto, ETA)."""
         conductor_loc = None
         conductor_db_id = None
         if conductor_session in self.conn.active:
             _, conductor_loc = self.conn.active[conductor_session]
             if conductor_loc:
                 conductor_db_id = conductor_loc.conductor_db_id
+
+        if not conductor_loc:
+            return {}, None
+
+        vehicle_info = {}
+        rating_count = 0
+        has_photo = False
+        if conductor_db_id:
+            from app.database import User as DbUser
+            conductor_user = db.query(DbUser).filter(DbUser.id == conductor_db_id).first()
+            if conductor_user:
+                vehicle_info = {
+                    "placa":  conductor_user.placa_numero  or "",
+                    "color":  conductor_user.color_carro   or "",
+                    "modelo": conductor_user.modelo_carro  or "",
+                }
+                rating_count = conductor_user.rating_count or 0
+                has_photo = bool(conductor_user.selfie_path)
+
+        dist_m = haversine(req.lat, req.lng, conductor_loc.lat, conductor_loc.lng)
+        eta_seconds = max(60, int(dist_m / 6.94))
+
+        conductor_info = {
+            "lat":          conductor_loc.lat,
+            "lng":          conductor_loc.lng,
+            "name":         conductor_loc.name,
+            "zone":         conductor_loc.zone_destination,
+            "rating":       conductor_loc.rating_avg,
+            "rating_count": rating_count,
+            "eta_seconds":  eta_seconds,
+            "foto":         f"/conductores/{conductor_db_id}/foto" if has_photo else None,
+            **vehicle_info,
+        }
+        return conductor_info, conductor_db_id
+
+    async def accept_request(self, conductor_session: str, request_id: str, db) -> None:
+        """El conductor acepta → se crea una OFERTA. El estudiante decide en OFFER_TIMEOUT_S."""
+        req = self.pending.get(request_id)
+        if not req:
+            await self.conn.send_to(conductor_session, {
+                "type": "trip_already_taken",
+                "request_id": request_id,
+            })
+            return
+        if conductor_session in req.offers:
+            return  # ya ofertó
+
+        conductor_info, conductor_db_id = self._build_conductor_info(conductor_session, req, db)
+        if not conductor_info:
+            return
+
+        task = asyncio.create_task(self._offer_timeout(request_id, conductor_session))
+        req.offers[conductor_session] = {"task": task, "info": conductor_info, "db_id": conductor_db_id}
+
+        await self.conn.send_to(req.student_session, {
+            "type":                 "conductor_offer",
+            "request_id":           request_id,
+            "conductor_session_id": conductor_session,
+            "conductor":            conductor_info,
+            "timeout_s":            OFFER_TIMEOUT_S,
+        })
+        await self.conn.send_to(conductor_session, {
+            "type":       "offer_waiting",
+            "request_id": request_id,
+        })
+
+    async def _offer_timeout(self, request_id: str, conductor_session: str):
+        await asyncio.sleep(OFFER_TIMEOUT_S)
+        req = self.pending.get(request_id)
+        if not req or conductor_session not in req.offers:
+            return
+        req.offers.pop(conductor_session, None)
+        await self.conn.send_to(conductor_session, {
+            "type":       "offer_declined",
+            "request_id": request_id,
+            "reason":     "timeout",
+        })
+
+    async def reject_offer(self, student_session: str, request_id: str, conductor_session: str):
+        req = self.pending.get(request_id)
+        if not req or req.student_session != student_session:
+            return
+        offer = req.offers.pop(conductor_session, None)
+        if not offer:
+            return
+        if offer["task"]:
+            offer["task"].cancel()
+        await self.conn.send_to(conductor_session, {
+            "type":       "offer_declined",
+            "request_id": request_id,
+            "reason":     "rejected",
+        })
+
+    async def confirm_offer(self, student_session: str, request_id: str,
+                             conductor_session: str, db) -> int | None:
+        """El estudiante acepta la oferta → se crea el viaje."""
+        req = self.pending.get(request_id)
+        if not req or req.student_session != student_session:
+            return None
+        offer = req.offers.get(conductor_session)
+        if not offer:
+            await self.conn.send_to(student_session, {
+                "type": "offer_expired",
+                "request_id": request_id,
+            })
+            return None
+        # El conductor debe seguir conectado
+        if conductor_session not in self.conn.active:
+            req.offers.pop(conductor_session, None)
+            await self.conn.send_to(student_session, {
+                "type": "offer_expired",
+                "request_id": request_id,
+            })
+            return None
+
+        # Pop atómico — cierra la solicitud para todos
+        self.pending.pop(request_id, None)
+        self.by_student.pop(req.student_session, None)
+        if req.timeout_task:
+            req.timeout_task.cancel()
+
+        # Cancelar todas las ofertas y avisar a los demás oferentes
+        for other_sid, other_offer in req.offers.items():
+            if other_offer["task"]:
+                other_offer["task"].cancel()
+            if other_sid != conductor_session:
+                await self.conn.send_to(other_sid, {
+                    "type":       "offer_declined",
+                    "request_id": request_id,
+                    "reason":     "student_chose_other",
+                })
+        # Avisar a los notificados que no ofertaron
+        for other_sid in req.notified:
+            if other_sid != conductor_session and other_sid not in req.offers:
+                await self.conn.send_to(other_sid, {
+                    "type": "trip_taken",
+                    "request_id": request_id,
+                })
+
+        conductor_info = offer["info"]
+        conductor_db_id = offer["db_id"]
 
         from app.database import Trip
         trip = Trip(
@@ -258,46 +395,6 @@ class TripManager:
             "conductor_db_id": conductor_db_id or 0,
             "student_db_id":  req.student_db_id,
         }
-
-        # Tell other notified conductors the trip is gone
-        for other_sid in req.notified:
-            if other_sid != conductor_session:
-                await self.conn.send_to(other_sid, {
-                    "type": "trip_taken",
-                    "request_id": request_id,
-                })
-
-        # Query conductor vehicle info and rating
-        vehicle_info = {}
-        rating_count = 0
-        if conductor_db_id:
-            from app.database import User as DbUser
-            conductor_user = db.query(DbUser).filter(DbUser.id == conductor_db_id).first()
-            if conductor_user:
-                vehicle_info = {
-                    "placa":  conductor_user.placa_numero  or "",
-                    "color":  conductor_user.color_carro   or "",
-                    "modelo": conductor_user.modelo_carro  or "",
-                }
-                rating_count = conductor_user.rating_count or 0
-
-        eta_seconds = None
-        if conductor_loc:
-            dist_m = haversine(req.lat, req.lng, conductor_loc.lat, conductor_loc.lng)
-            eta_seconds = max(60, int(dist_m / 6.94))
-
-        conductor_info = {}
-        if conductor_loc:
-            conductor_info = {
-                "lat":          conductor_loc.lat,
-                "lng":          conductor_loc.lng,
-                "name":         conductor_loc.name,
-                "zone":         conductor_loc.zone_destination,
-                "rating":       conductor_loc.rating_avg,
-                "rating_count": rating_count,
-                "eta_seconds":  eta_seconds,
-                **vehicle_info,
-            }
 
         await self.conn.send_to(req.student_session, {
             "type":                "trip_accepted",
@@ -332,7 +429,16 @@ class TripManager:
         req = self.pending[request_id]
         if req.timeout_task:
             req.timeout_task.cancel()
+        for conductor_sid, offer in req.offers.items():
+            if offer["task"]:
+                offer["task"].cancel()
+            await self.conn.send_to(conductor_sid, {
+                "type": "trip_cancelled",
+                "request_id": request_id,
+            })
         for conductor_sid in req.notified:
+            if conductor_sid in req.offers:
+                continue
             await self.conn.send_to(conductor_sid, {
                 "type": "trip_cancelled",
                 "request_id": request_id,
@@ -543,6 +649,9 @@ class TripManager:
         req = self.pending.pop(request_id, None)
         if req:
             self.by_student.pop(req.student_session, None)
+            for offer in req.offers.values():
+                if offer["task"]:
+                    offer["task"].cancel()
 
 
 manager = ConnectionManager()
