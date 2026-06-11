@@ -1255,6 +1255,8 @@ function addOrUpdateMarker(user) {
   const isMe = user.id === myId;
   if (isMe && _myMarker) { _myMarker.remove(); _myMarker = null; }
   const isStudent = currentUser && currentUser.role === "estudiante";
+  // Un estudiante nunca debe ver a otro estudiante (defensa extra al filtro del servidor)
+  if (isStudent && user.role === "estudiante" && !isMe) return;
   if (isStudent && !showingNearby && user.role === "conductor") {
     _pendingConductors[user.id] = user;
     return;

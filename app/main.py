@@ -95,7 +95,9 @@ async def health():
 
 @app.get("/usuarios/activos", tags=["API"])
 async def usuarios_activos():
-    usuarios = manager.get_all_locations()
+    # Endpoint público: solo conductores. Las ubicaciones de estudiantes
+    # nunca se exponen sin autenticación.
+    usuarios = [u for u in manager.get_all_locations() if u["role"] == "conductor"]
     return {"total": len(usuarios), "usuarios": usuarios}
 
 
@@ -125,11 +127,16 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         return
 
     session_id = str(uuid.uuid4())
-    await manager.connect(websocket, session_id)
+    await manager.connect(websocket, session_id, role=user.role)
 
+    # Snapshot filtrado por rol: los estudiantes solo ven conductores;
+    # los conductores ven todo (necesitan ver estudiantes que solicitan).
+    snapshot_users = manager.get_all_locations()
+    if user.role == "estudiante":
+        snapshot_users = [u for u in snapshot_users if u["role"] == "conductor"]
     await websocket.send_text(json.dumps({
         "type": "snapshot",
-        "users": manager.get_all_locations(),
+        "users": snapshot_users,
         "zones": ALLOWED_ZONES,
     }))
 
@@ -159,7 +166,12 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     rating_avg=rating_avg,
                 )
                 location = manager.set_location(session_id, location)
-                await manager.broadcast({"type": "update", "user": location.model_dump()})
+                # Ubicación de estudiante: solo la ven los conductores.
+                # Ubicación de conductor: la ven todos.
+                if user.role == "estudiante":
+                    await manager.broadcast_to_role({"type": "update", "user": location.model_dump()}, "conductor")
+                else:
+                    await manager.broadcast({"type": "update", "user": location.model_dump()})
                 # Restore trip if user reconnected during grace period
                 restored = await trip_manager.try_reconnect_trip(session_id, user.id)
                 if restored:
@@ -216,7 +228,10 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                 if loc_data:
                     updated = loc_data.model_copy(update={"zone_destination": zone})
                     manager.active[session_id] = (manager.active[session_id][0], updated)
-                    await manager.broadcast({"type": "update", "user": updated.model_dump()})
+                    if user.role == "estudiante":
+                        await manager.broadcast_to_role({"type": "update", "user": updated.model_dump()}, "conductor")
+                    else:
+                        await manager.broadcast({"type": "update", "user": updated.model_dump()})
 
             elif msg_type == "passenger_onboard":
                 if user.role != "conductor":

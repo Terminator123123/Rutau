@@ -42,11 +42,14 @@ class ConnectionManager:
     def __init__(self):
         self.active: dict[str, tuple[WebSocket, UserLocation | None]] = {}
         self.connected_at: dict[str, float] = {}
+        self.roles: dict[str, str] = {}
 
-    async def connect(self, websocket: WebSocket, session_id: str):
+    async def connect(self, websocket: WebSocket, session_id: str, role: str | None = None):
         await websocket.accept()
         self.active[session_id] = (websocket, None)
         self.connected_at[session_id] = time.time()
+        if role:
+            self.roles[session_id] = role
 
     def set_location(self, session_id: str, location: UserLocation) -> UserLocation:
         if location.role == "conductor":
@@ -63,6 +66,7 @@ class ConnectionManager:
     def disconnect(self, session_id: str):
         self.active.pop(session_id, None)
         self.connected_at.pop(session_id, None)
+        self.roles.pop(session_id, None)
 
     def get_connected_at(self, session_id: str) -> float:
         return self.connected_at.get(session_id, time.time())
@@ -91,6 +95,20 @@ class ConnectionManager:
         message = json.dumps(payload)
         dead = []
         for uid, (ws, _) in self.active.items():
+            try:
+                await ws.send_text(message)
+            except Exception:
+                dead.append(uid)
+        for uid in dead:
+            self.disconnect(uid)
+
+    async def broadcast_to_role(self, payload: dict, role: str):
+        """Envía el mensaje solo a las sesiones con el rol indicado."""
+        message = json.dumps(payload)
+        dead = []
+        for uid, (ws, _) in self.active.items():
+            if self.roles.get(uid) != role:
+                continue
             try:
                 await ws.send_text(message)
             except Exception:

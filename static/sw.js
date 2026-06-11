@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'colectivou-v2';
+const CACHE_VERSION = 'colectivou-v3';
 const STATIC_ASSETS = [
   '/dev',
   '/static/style.css',
