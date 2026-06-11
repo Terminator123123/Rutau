@@ -40,9 +40,62 @@ function readSessionCookie() {
   try { return JSON.parse(decodeURIComponent(match.split("=")[1])); } catch (_) { return null; }
 }
 
+// ── PWA Install ───────────────────────────────────────────────────────────
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  if (currentUser) _showInstallBanner();
+});
+
+function _showInstallBanner() {
+  if (!_deferredInstallPrompt) return;
+  let banner = document.getElementById('pwa-install-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.style.cssText = [
+      'position:fixed', 'bottom:80px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#2563eb', 'color:#fff', 'border-radius:1rem', 'padding:0.75rem 1.25rem',
+      'font-size:0.875rem', 'font-weight:600', 'box-shadow:0 4px 16px rgba(37,99,235,0.4)',
+      'display:flex', 'align-items:center', 'gap:0.75rem', 'z-index:9999',
+      'animation:slideUp 0.3s ease',
+    ].join(';');
+    banner.innerHTML = `
+      <span>📲 Instalar ColectivoU</span>
+      <button onclick="installPWA()" style="background:#fff;color:#2563eb;border:none;
+        border-radius:0.5rem;padding:0.35rem 0.75rem;font-weight:700;cursor:pointer;font-size:0.8rem;">
+        Instalar
+      </button>
+      <button onclick="this.closest('#pwa-install-banner').remove()" style="background:transparent;
+        border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:1.2rem;line-height:1;">×</button>
+    `;
+    document.body.appendChild(banner);
+    setTimeout(() => banner?.remove(), 15000);
+  }
+}
+
+async function installPWA() {
+  if (!_deferredInstallPrompt) return;
+  _deferredInstallPrompt.prompt();
+  const { outcome } = await _deferredInstallPrompt.userChoice;
+  _deferredInstallPrompt = null;
+  document.getElementById('pwa-install-banner')?.remove();
+}
+
+window.addEventListener('appinstalled', () => {
+  _deferredInstallPrompt = null;
+  document.getElementById('pwa-install-banner')?.remove();
+});
+
 // ── Init ───────────────────────────────────────────────────────────────────
 
 window.addEventListener("DOMContentLoaded", () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/sw.js')
+      .catch(err => console.warn('SW registration failed:', err));
+  }
   initMap();
   startBgPoll();
   setupFormValidation();
@@ -577,6 +630,7 @@ function updateMyMarker(lat, lng) {
 function connectWS(lat, lng) {
   // Avoid creating a second connection if one is already open or connecting
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  stopBgPoll();
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen    = () => { setStatus("connected", "En vivo"); sendLocation(lat, lng); };
@@ -1354,6 +1408,7 @@ function cleanup() {
   _pendingBoardingTrip = null;
   if (_myMarker) { _myMarker.remove(); _myMarker = null; }
   Object.keys(_pendingConductors).forEach(k => delete _pendingConductors[k]);
+  startBgPoll();
 }
 
 function openEditModal() {
