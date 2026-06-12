@@ -96,11 +96,8 @@ ADMIN_PASSWORD=tu_contraseña_admin
 - Sistema de autenticación JWT con cookies httponly y verificación de email
 - Gestor de conexiones WebSocket en tiempo real (`manager.py`)
 - Flujo completo de solicitud y aceptación de viajes entre estudiante y conductor
-- Sistema de verificación de conductores con subida de documentos
-- Integración con la API de Brevo para correos transaccionales
 - Diseño del frontend (HTML/CSS/JS) con mapa interactivo y menú lateral
-- Panel de administrador con autenticación Basic Auth
-- Diagnóstico y corrección de errores en producción (Railway)
+
 
 Todo el código fue revisado y comprendido durante el desarrollo. El autor puede explicar cualquier parte del sistema en la sustentación.
 
